@@ -47,13 +47,21 @@ function deviceKey(): string {
 
 export interface Person { name: string; photo: string; upFor: string[] }
 export interface Message { id: string; from: string; to: string; text: string; listingId?: string; at: number; state?: 'sending' | 'failed' | 'rejected'; why?: string }
-interface Shared { rev: number; me: string; listings: Listing[]; people: Record<string, Person>; messages: Message[]; blocked: string[] }
-const NOTHING: Shared = { rev: 0, me: '', listings: [], people: {}, messages: [], blocked: [] }
+export type Role = '' | 'owner' | 'admin'
+export interface Look { id: string; ownerId: string; caption: string; brands: string[]; photoCount: number; createdAt: number }
+export interface Fit { lookId: string; note: string; at: number; by: string }
+export interface Report { id: string; by: string; user: string; reason: string; at: number; resolved?: number; evidence: Message[] }
+interface Shared {
+  rev: number; me: string; listings: Listing[]; people: Record<string, Person>; messages: Message[]; blocked: string[]
+  roles: Record<string, Role>; myRole: Role; looks: Look[]; fit: Fit | null
+}
+const NOTHING: Shared = { rev: 0, me: '', listings: [], people: {}, messages: [], blocked: [], roles: {}, myRole: '', looks: [], fit: null }
 
 export const NO_ONE: Person = { name: '', photo: '', upFor: [] }
 export const nameOf = (p: Person | undefined) => p?.name.trim() || 'Someone new'
 
 type Reply = { status: number; error?: string; data: (Shared & { same?: boolean; id?: string }) | null }
+export type { Reply }
 
 async function call(method: string, path: string, body?: unknown): Promise<Reply> {
   try {
@@ -197,6 +205,26 @@ export function useStore() {
   }, [deliver])
   const discardMessage = useCallback((id: string) => setOutbox((cur) => cur.filter((x) => x.id !== id)), [])
 
+  const addLook = useCallback(async (look: { caption: string; brands: string[]; photos: string[] }): Promise<string> => {
+    const r = await call('POST', 'looks', look)
+    return take(r.data) ? r.data!.id ?? '' : ''
+  }, [take])
+  const removeLook = useCallback(async (id: string) => take(await fetchData('DELETE', `looks/${id}`)), [take])
+  const claimRole = useCallback(async (code: string) => {
+    const r = await call('POST', 'team/claim', { code })
+    take(r.data)
+    return r.data ? 'ok' : r.error === 'rate_limited' ? 'slow' : r.status === 0 ? 'offline' : 'wrong'
+  }, [take])
+  const pickFit = useCallback(async (lookId: string | null, note = '') => take(await fetchData('POST', 'team/fit', { lookId, note })), [take])
+  const teamReports = useCallback(async (): Promise<Report[] | null> => {
+    const r = await call('GET', 'team/reports')
+    return (r.data as unknown as { reports?: Report[] } | null)?.reports ?? null
+  }, [])
+  const resolveReport = useCallback(async (id: string) => {
+    const r = await call('POST', 'team/resolve', { id })
+    return (r.data as unknown as { reports?: Report[] } | null)?.reports ?? null
+  }, [])
+
   const setBlocked = useCallback(async (user: string, on: boolean) => take(await fetchData('POST', 'block', { user, on })), [take])
   const report = useCallback(async (user: string, reason: string) => take(await fetchData('POST', 'report', { user, reason })), [take])
 
@@ -229,7 +257,9 @@ export function useStore() {
 
   return {
     listings, mine, saved, online, me: shared.me, people: shared.people, blocked: shared.blocked, chats, unread,
+    roles: shared.roles ?? {}, myRole: shared.myRole ?? '', looks: shared.looks ?? [], fit: shared.fit ?? null,
     addListing, removeListing, toggleSaved, sendMessage, retryMessage, discardMessage, setBlocked, report, markRead,
+    addLook, removeLook, claimRole, pickFit, teamReports, resolveReport,
   }
 }
 

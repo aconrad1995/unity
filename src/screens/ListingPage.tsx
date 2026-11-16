@@ -5,6 +5,7 @@ import { NO_ONE, bumpStat, nameOf, type Store } from '../store'
 import { Avatar } from './ProfilePage'
 import { noteListing } from '../taste'
 import { SaveButton } from './Card'
+import { RoleBadge } from './Team'
 import { PageHeader } from './PageHeader'
 
 export default function ListingPage({ store, id }: { store: Store; id: string }) {
@@ -100,6 +101,7 @@ export default function ListingPage({ store, id }: { store: Store; id: string })
               <Avatar profile={seller} size={52} />
               <span>
                 <strong>Sold by {isMine ? 'you' : nameOf(seller)}</strong>
+                <RoleBadge role={store.roles[listing.ownerId!]} />
                 {seller.upFor.length > 0
                   ? <span className="seller-upfor">Say hi about: {seller.upFor.join(', ').toLowerCase()}</span>
                   : isMine && <span className="seller-upfor">Tap to edit your profile</span>}
@@ -140,6 +142,19 @@ export default function ListingPage({ store, id }: { store: Store; id: string })
             </div>
           )}
 
+          {!isMine && !listing.sample && store.myRole && (
+            <button
+              type="button"
+              className="link-btn danger"
+              onClick={() => {
+                if (window.confirm('Remove this listing for breaking the rules? This cannot be undone.')) {
+                  store.removeListing(listing.id).then((ok) => { if (ok) window.location.hash = '#/' })
+                }
+              }}
+            >
+              Remove this listing (team)
+            </button>
+          )}
           {isMine && (
             <button
               type="button"

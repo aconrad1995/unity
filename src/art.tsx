@@ -20,6 +20,7 @@ export const ProfileIcon = () => <Icon><circle cx="12" cy="8.500" r="3.500" /><p
 export const CloseIcon = () => <Icon><path d="M6 6l12 12M18 6 6 18" /></Icon>
 export const ChatIcon = () => <Icon><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-7l-5 4v-4H6a2 2 0 0 1-2-2V6Z" /></Icon>
 export const SendIcon = () => <Icon><path d="M4 12 20 4l-5 16-3-7-8-1Z" /></Icon>
+export const BellIcon = () => <Icon><path d="M6 16V11a6 6 0 0 1 12 0v5l1.500 2h-15L6 16Z" /><path d="M10 20.500a2.200 2.200 0 0 0 4 0" /></Icon>
 export const CheckIcon = () => <Icon strokeWidth={2.6}><path d="m5 12 5 5 9-10" /></Icon>
 export const HeartIcon = ({ filled }: { filled?: boolean }) => (
   <Icon fill={filled ? 'currentColor' : 'none'}>

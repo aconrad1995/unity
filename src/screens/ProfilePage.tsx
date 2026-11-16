@@ -5,6 +5,7 @@ import { shrinkPhoto, useProfile, type Store } from '../store'
 import { readTaste, resetTaste, topOf } from '../taste'
 import { Card } from './Card'
 import { PageHeader } from './PageHeader'
+import { RoleBadge } from './Team'
 
 export function Avatar({ profile, size = 96 }: { profile: { photo: string }; size?: number }) {
   return profile.photo ? (
@@ -84,6 +85,7 @@ export default function ProfilePage({ store }: { store: Store }) {
               <span>Your name</span>
               <input value={profile.name} onChange={(e) => update({ name: e.target.value })} placeholder="What should people call you?" maxLength={30} autoComplete="nickname" />
             </label>
+            <RoleBadge role={store.myRole} />
             {profile.photo && <button type="button" className="link-btn" onClick={() => update({ photo: '' })}>Remove picture</button>}
           </div>
           {photoProblem && <p className="error" role="alert">{photoProblem}</p>}
@@ -162,11 +164,18 @@ export default function ProfilePage({ store }: { store: Store }) {
           <a className="btn btn-soft" href="#/chats">Open my chats</a>
         </section>
 
+        <div className="profile-links">
+          <a className="btn btn-soft" href="#/inspo">Inspo and looks</a>
+          <a className="btn btn-soft" href="#/alerts">New for you</a>
+        </div>
         <a className="btn btn-soft" href="#/saved">My saved outfits{store.saved.length > 0 ? ` (${store.saved.length})` : ''}</a>
 
         <p className="fineprint">
           Other people can see your name, picture, listings and “say hi about” picks. Your sizes, style,
           favourite brands and what the shop has learned stay private on this device.
+        </p>
+        <p className="fineprint fineprint-link">
+          {store.myRole ? <a href="#/team">Team tools</a> : <>Part of the {APP_NAME} team? <a href="#/team">Team sign-in</a></>}
         </p>
       </main>
     </>

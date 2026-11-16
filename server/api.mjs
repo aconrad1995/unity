@@ -18,7 +18,7 @@ import { join, resolve } from 'node:path'
 const DIR = resolve(process.env.UNITY_DATA_DIR || join(process.cwd(), '.data'))
 const FILE = join(DIR, 'unity.json')
 const MAX_BODY = 4_000_000
-const EMPTY = { rev: 1, listings: [], people: {}, messages: [], blocks: {}, reports: [] }
+const EMPTY = { rev: 1, listings: [], people: {}, messages: [], blocks: {}, reports: [], roles: {}, looks: [], fit: null }
 
 // Must match src/data.ts
 const CATEGORIES = ['Sets', 'Tops', 'Bottoms', 'Bodysuits', 'Bikini', 'Accessories']
@@ -29,6 +29,7 @@ const ART_KINDS = ['set', 'top', 'bottom', 'bodysuit', 'bikini', 'accessory']
 const MAX_PER_CHAT = 2000
 const MAX_LISTINGS_PER_PERSON = 50
 const MAX_PHOTOS = 5
+const MAX_LOOK_PHOTOS = 4
 
 /* ---------- Saving: never lose or silently reset data ---------- */
 let db
@@ -138,6 +139,18 @@ const jpegOk = (v, max) =>
   Buffer.from(v.slice(23, 31), 'base64').subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]))
 const photoOk = (v, max) => typeof v === 'string' && v.length <= max && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(v)
 
+/* ---------- Team roles ----------
+   The shop owner and administrators prove who they are once per device by typing a team code.
+   The codes are set on the host (UNITY_OWNER_CODE, UNITY_ADMIN_CODE) and never stored in the code. */
+const roleOf = (id) => db.roles[id] ?? ''
+const isStaff = (id) => roleOf(id) !== ''
+function codeIs(given, want) {
+  if (typeof want !== 'string' || want.length < 8 || typeof given !== 'string') return false
+  const a = Buffer.from(given.trim())
+  const b = Buffer.from(want)
+  return a.length === b.length && timingSafeEqual(a, b)
+}
+
 function knownPerson(id) {
   return !!db.people[id] || db.listings.some((l) => l.ownerId === id) || db.messages.some((m) => m.from === id)
 }
@@ -193,7 +206,19 @@ function snapshot(me) {
       .filter((m) => (m.from === me ? true : m.to === me && !m.dropped && !hasBlocked(me, m.from)))
       .map(({ dropped, ...m }) => m),
     blocked: db.blocks[me] ?? [],
+    roles: db.roles,
+    myRole: roleOf(me),
+    looks: db.looks.map(({ photos, ...l }) => ({ ...l, photoCount: photos.length })),
+    fit: db.fit,
   }
+}
+
+function checkLook(b) {
+  const photos = Array.isArray(b.photos) ? b.photos : []
+  if (photos.length < 1 || photos.length > MAX_LOOK_PHOTOS) throw new Refuse(400, 'bad_photo')
+  if (!photos.every((p) => jpegOk(p, 700_000))) throw new Refuse(400, 'bad_photo')
+  const brands = Array.isArray(b.brands) ? [...new Set(b.brands.map((x) => text(x, 40)).filter(Boolean))].slice(0, 8) : []
+  return { caption: text(b.caption, 300), brands, photos }
 }
 
 function checkListing(b) {
@@ -233,7 +258,7 @@ export async function api(req, res, next) {
     // Listing photos load as ordinary pictures, so they cannot carry the secret key. They are public like the listing.
     if (req.method === 'GET' && path.startsWith('photo/')) {
       const [, id, n] = path.split('/')
-      const data = db.listings.find((l) => l.id === id)?.photos?.[Number(n)]
+      const data = (db.listings.find((l) => l.id === id) ?? db.looks.find((l) => l.id === id))?.photos?.[Number(n)]
       if (!data) throw new Refuse(404, 'not_found')
       res.statusCode = 200
       res.setHeader('Content-Type', 'image/jpeg')
@@ -271,10 +296,11 @@ export async function api(req, res, next) {
     }
 
     if (req.method === 'POST' && path === 'listings') {
-      if (!allow(`list:${me}`, 10, HOUR)) throw new Refuse(429, 'rate_limited')
+      // The team (the owner stocking the shop) gets far higher limits than everyone else.
+      if (!allow(`list:${me}`, isStaff(me) ? 300 : 10, HOUR)) throw new Refuse(429, 'rate_limited')
       const b = await readBody(req)
       const fields = checkListing(b)
-      if (db.listings.filter((l) => l.ownerId === me).length >= MAX_LISTINGS_PER_PERSON) throw new Refuse(400, 'too_many_listings')
+      if (db.listings.filter((l) => l.ownerId === me).length >= (isStaff(me) ? 5000 : MAX_LISTINGS_PER_PERSON)) throw new Refuse(400, 'too_many_listings')
       db.listings.unshift({ id: randomUUID(), ownerId: me, ...fields, seller: '', sample: false, createdAt: Date.now() })
       save()
       return send(res, 200, { ...snapshot(me), id: db.listings[0].id })
@@ -282,7 +308,7 @@ export async function api(req, res, next) {
 
     if (req.method === 'DELETE' && path.startsWith('listings/')) {
       const id = path.slice(9)
-      db.listings = db.listings.filter((l) => !(l.id === id && l.ownerId === me))
+      db.listings = db.listings.filter((l) => !(l.id === id && (l.ownerId === me || isStaff(me))))
       save()
       return send(res, 200, snapshot(me))
     }
@@ -339,6 +365,64 @@ export async function api(req, res, next) {
         .slice(-20)
         .map(({ dropped, ...m }) => m)
       db.reports.push({ id: randomUUID(), by: me, user: b.user, reason, evidence, at: Date.now() })
+      save()
+      return send(res, 200, snapshot(me))
+    }
+
+    /* ---------- Looks (Inspo) ---------- */
+    if (req.method === 'POST' && path === 'looks') {
+      if (!allow(`look:${me}`, isStaff(me) ? 200 : 10, DAY)) throw new Refuse(429, 'rate_limited')
+      const b = await readBody(req)
+      const fields = checkLook(b)
+      if (db.looks.filter((l) => l.ownerId === me).length >= (isStaff(me) ? 5000 : 200)) throw new Refuse(400, 'too_many_looks')
+      db.looks.unshift({ id: randomUUID(), ownerId: me, ...fields, createdAt: Date.now() })
+      save()
+      return send(res, 200, { ...snapshot(me), id: db.looks[0].id })
+    }
+
+    if (req.method === 'DELETE' && path.startsWith('looks/')) {
+      const id = path.slice(6)
+      const look = db.looks.find((l) => l.id === id)
+      if (look && (look.ownerId === me || isStaff(me))) {
+        db.looks = db.looks.filter((l) => l.id !== id)
+        if (db.fit?.lookId === id) db.fit = null
+        save()
+      }
+      return send(res, 200, snapshot(me))
+    }
+
+    /* ---------- Team ---------- */
+    if (req.method === 'POST' && path === 'team/claim') {
+      if (!allow(`claim:${ipOf(req)}`, 8, HOUR) || !allow(`claimme:${me}`, 8, HOUR)) throw new Refuse(429, 'rate_limited')
+      const b = await readBody(req)
+      const role = codeIs(b.code, process.env.UNITY_OWNER_CODE) ? 'owner' : codeIs(b.code, process.env.UNITY_ADMIN_CODE) ? 'admin' : ''
+      if (!role) throw new Refuse(403, 'wrong_code')
+      db.roles[me] = role
+      save()
+      return send(res, 200, snapshot(me))
+    }
+
+    if (path.startsWith('team/') && !isStaff(me)) throw new Refuse(404, 'not_found')
+
+    if (req.method === 'GET' && path === 'team/reports') return send(res, 200, { reports: db.reports })
+
+    if (req.method === 'POST' && path === 'team/resolve') {
+      const b = await readBody(req)
+      const r = db.reports.find((x) => x.id === b.id)
+      if (!r) throw new Refuse(404, 'not_found')
+      r.resolved = Date.now()
+      r.resolvedBy = me
+      save()
+      return send(res, 200, { reports: db.reports })
+    }
+
+    if (req.method === 'POST' && path === 'team/fit') {
+      const b = await readBody(req)
+      if (b.lookId === null) db.fit = null
+      else {
+        if (!db.looks.some((l) => l.id === b.lookId)) throw new Refuse(404, 'not_found')
+        db.fit = { lookId: b.lookId, note: text(b.note, 280), at: Date.now(), by: me }
+      }
       save()
       return send(res, 200, snapshot(me))
     }

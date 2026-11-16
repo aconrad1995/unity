@@ -16,6 +16,8 @@ Ravers and festival-goers. The first version must win over **buyers hunting a lo
 
 ## Product Purpose
 
+**Mary is the shop owner; this is her passion project.** Andy is the administrator. Both sign in to team tools with a code set on the host. The owner's badge shows on her listings, looks and chats, and her looks appear as "Mary's favourites" on Inspo.
+
 A community app for the rave scene, started by Mary and her partner, who want to build something impactful in that community. It has three planned parts, built in this order:
 
 1. **Resale marketplace** (first): buy and sell lightly worn rave outfits.
@@ -42,7 +44,10 @@ Used mostly on a phone. Buyers shop ahead of a specific event, so brand, size an
 - Identity: no sign-up or password. Each device holds a secret key; losing the browser data loses the account. Real sign-in is undecided.
 - Chats: private between two people, started from a listing. Block and report exist; reports are saved in the data file and nobody is assigned to review them yet. Age rules and moderation policy are undecided.
 - Private on the device only: sizes, style, favourite brands, saved outfits, learned taste.
-- No real payments yet. Sample listings are labelled and cannot be messaged.
+- Inspo: anyone can post a look (photos, caption, brands worn). The team picks a fit of the week. No likes or follower counts.
+- Alerts: new listings matching your favourite brands and sizes show under the bell; matching runs on the phone. No phone push notifications yet.
+- Idea under consideration (not built): free posting for brands' first 10 outfits.
+- No real payments yet. Fee idea: 10% of each sale (undecided). Sample listings are labelled and cannot be messaged.
 
 ## Brand Commitments
 

@@ -12,6 +12,11 @@ services:
         value: "22"
       - key: UNITY_DATA_DIR
         value: /var/data     # listings, profiles and chats are kept here
+      # Team codes: typed once on a phone to unlock team tools. Set them in Render > Environment.
+      - key: UNITY_OWNER_CODE   # Mary, shop owner
+        sync: false
+      - key: UNITY_ADMIN_CODE   # Andy, administrator
+        sync: false
     disk:
       name: unity-data
       mountPath: /var/data

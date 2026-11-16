@@ -8,9 +8,14 @@ import ForBrands from './screens/ForBrands'
 import Events from './screens/Events'
 import ProfilePage from './screens/ProfilePage'
 import { ChatList, ChatThread } from './screens/Chats'
+import { ReportsPage, TeamPage } from './screens/Team'
+import { InspoPage, LookPage, PostLook } from './screens/Inspo'
+import AlertsPage from './screens/AlertsPage'
+import { useAlerts } from './alerts'
 
 export default function App() {
   const store = useStore()
+  const alerts = useAlerts(store)
   const [page, id, extra] = useRoute()
   const tab = page === 'sell' ? 'sell' : page === 'chats' ? 'chats' : page === 'events' ? 'events' : page === 'you' ? 'you' : 'shop'
 
@@ -21,8 +26,13 @@ export default function App() {
   else if (page === 'for-brands') screen = <ForBrands />
   else if (page === 'events') screen = <Events />
   else if (page === 'chats') screen = id ? <ChatThread key={id} store={store} user={id} listingId={extra} /> : <ChatList store={store} />
+  else if (page === 'team') screen = id === 'reports' ? <ReportsPage store={store} /> : <TeamPage store={store} />
+  else if (page === 'inspo') screen = id === 'new' ? <PostLook store={store} /> : <InspoPage store={store} />
+  else if (page === 'look' && id) screen = <LookPage key={id} store={store} id={id} />
+  else if (page === 'alerts') screen = <AlertsPage store={store} alerts={alerts} />
+  else if (page === 'brand' && id) screen = <Shop key={id} store={store} alerts={alerts} initialBrand={decodeURIComponent(id)} />
   else if (page === 'you') screen = <ProfilePage store={store} />
-  else screen = <Shop store={store} />
+  else screen = <Shop store={store} alerts={alerts} />
 
   return (
     <div className="app">

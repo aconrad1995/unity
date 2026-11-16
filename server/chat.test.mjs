@@ -4,6 +4,8 @@ import { freshDir, start, listing } from './test-helpers.mjs'
 
 process.env.UNITY_DATA_DIR = freshDir()
 process.env.UNITY_ADMIN_TOKEN = 'admin-token-for-tests'
+process.env.UNITY_OWNER_CODE = 'owner-code-for-tests'
+process.env.UNITY_ADMIN_CODE = 'admin-code-for-tests'
 const app = await start()
 after(() => app.stop())
 
@@ -156,4 +158,56 @@ test('listing photos: things that are not JPEG pictures are refused', async () =
   assert.equal((await b.call('POST', 'listings', listing({ art: undefined, photos: [svg] }))).status, 400)
   assert.equal((await b.call('POST', 'listings', listing({ art: undefined, photos: [fake] }))).status, 400)
   assert.equal((await b.call('POST', 'listings', listing({ art: undefined, photos: Array(6).fill(jpeg()) }))).status, 400)
+})
+
+test('team codes: the right code gives the right role, a wrong one gives nothing', async () => {
+  const mary = app.person('M'), andy = app.person('N'), guess = app.person('O')
+  await mary.call('PUT', 'me', { name: 'Mary' }); await andy.call('PUT', 'me', { name: 'Andy' })
+  assert.equal((await guess.call('POST', 'team/claim', { code: 'owner-code-for-test' })).status, 403)
+  assert.equal((await guess.call('POST', 'team/claim', { code: '' })).status, 403)
+  assert.equal((await mary.call('POST', 'team/claim', { code: 'owner-code-for-tests' })).body.myRole, 'owner')
+  assert.equal((await andy.call('POST', 'team/claim', { code: 'admin-code-for-tests' })).body.myRole, 'admin')
+  const roles = (await guess.call('GET', 'sync')).body.roles
+  assert.equal(roles[await mary.id()], 'owner') // everyone can see who the owner is, so fakes can be spotted
+  assert.equal((await guess.call('GET', 'team/reports')).status, 404)
+  assert.equal((await andy.call('GET', 'team/reports')).status, 200)
+})
+
+test('guessing team codes is slowed down', async () => {
+  const p = app.person('P', '198.51.100.7')
+  const codes = []
+  for (let i = 0; i < 10; i++) codes.push((await p.call('POST', 'team/claim', { code: `nope-${i}-xxxxxxxx` })).status)
+  assert.equal(codes.filter((s) => s === 429).length, 2)
+})
+
+test('the owner can stock the shop without hitting the normal limits, and remove anyone’s listing', async () => {
+  const mary = app.person('M')
+  for (let i = 0; i < 15; i++) assert.equal((await mary.call('POST', 'listings', listing({ title: `Mary ${i}` }))).status, 200)
+  const theirs = await c.call('POST', 'listings', listing({ title: 'Breaks the rules' }))
+  const after = await mary.call('DELETE', `listings/${theirs.body.id}`)
+  assert.equal(after.body.listings.some((l) => l.title === 'Breaks the rules'), false)
+})
+
+test('looks: posting, photos, fit of the week picked only by the team, removal clears it', async () => {
+  const mary = app.person('M')
+  assert.equal((await c.call('POST', 'looks', { caption: 'no photo', photos: [] })).status, 400)
+  const look = await c.call('POST', 'looks', { caption: 'Festival fit', brands: ['Badinka', 'Badinka', 'iHeartRaves'], photos: [jpeg(7)] })
+  assert.equal(look.status, 200)
+  const shown = look.body.looks.find((l) => l.id === look.body.id)
+  assert.deepEqual(shown.brands, ['Badinka', 'iHeartRaves'])
+  assert.equal(shown.photoCount, 1)
+  assert.equal((await fetch(`${app.base}/api/photo/${look.body.id}/0`)).status, 200)
+  assert.equal((await c.call('POST', 'team/fit', { lookId: look.body.id })).status, 404) // not team
+  const picked = await mary.call('POST', 'team/fit', { lookId: look.body.id, note: 'Love the layering' })
+  assert.equal(picked.body.fit.lookId, look.body.id)
+  assert.equal((await b.call('DELETE', `looks/${look.body.id}`)).body.looks.some((l) => l.id === look.body.id), true) // not theirs
+  const gone = await mary.call('DELETE', `looks/${look.body.id}`)
+  assert.equal(gone.body.fit, null)
+})
+
+test('the team can mark reports as handled', async () => {
+  const andy = app.person('N')
+  const { reports } = (await andy.call('GET', 'team/reports')).body
+  const done = await andy.call('POST', 'team/resolve', { id: reports[0].id })
+  assert.ok(done.body.reports[0].resolved)
 })

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { HeartIcon, SearchIcon, Sparkle } from '../art'
+import { BellIcon, HeartIcon, SearchIcon, Sparkle } from '../art'
+import type { Alerts } from '../alerts'
 import { APP_NAME, CATEGORIES, FEATURED, SIZES, conditionLabel, featuredFor } from '../data'
 import { bumpStat, readProfile, type Store } from '../store'
 import { hasSignals, note, noteSearch, readTaste, score } from '../taste'
@@ -7,9 +8,9 @@ import { Card } from './Card'
 
 type Sort = 'you' | 'new' | 'low' | 'high'
 
-export default function Shop({ store }: { store: Store }) {
+export default function Shop({ store, alerts, initialBrand = '' }: { store: Store; alerts: Alerts; initialBrand?: string }) {
   const [query, setQuery] = useState('')
-  const [brand, setBrand] = useState('')
+  const [brand, setBrand] = useState(initialBrand)
   const [category, setCategory] = useState('')
   const [size, setSize] = useState('')
   // What this shopper is into, read once per visit so the order doesn't jump while they browse.
@@ -77,10 +78,16 @@ export default function Shop({ store }: { store: Store }) {
               {APP_NAME}
               <Sparkle size={18} className="wordmark-star" />
             </a>
-            <a href="#/saved" className="saved-link">
-              <HeartIcon filled={store.saved.length > 0} />
-              <span>Saved{store.saved.length > 0 ? ` (${store.saved.length})` : ''}</span>
-            </a>
+            <span className="top-links">
+              <a href="#/alerts" className="saved-link bell-link" aria-label={alerts.fresh > 0 ? `New for you: ${alerts.fresh} new ${alerts.fresh === 1 ? 'outfit' : 'outfits'}` : 'New for you'}>
+                <BellIcon />
+                {alerts.fresh > 0 && <span className="tab-count bell-count" aria-hidden="true">{alerts.fresh}</span>}
+              </a>
+              <a href="#/saved" className="saved-link">
+                <HeartIcon filled={store.saved.length > 0} />
+                <span>Saved{store.saved.length > 0 ? ` (${store.saved.length})` : ''}</span>
+              </a>
+            </span>
           </div>
           <label className="search">
             <span className="sr-only">Search outfits</span>
@@ -98,6 +105,7 @@ export default function Shop({ store }: { store: Store }) {
       </header>
 
       <main className="page">
+        <InspoStrip store={store} />
         <section aria-labelledby="brands-h">
           <h2 id="brands-h" className="row-h">Shop by brand</h2>
           <div className="bubbles" role="group" aria-label="Brand">
@@ -208,5 +216,20 @@ export default function Shop({ store }: { store: Store }) {
         </p>
       </main>
     </>
+  )
+}
+
+/** A small doorway to Inspo at the top of the shop: the fit of the week when there is one. */
+function InspoStrip({ store }: { store: Store }) {
+  const fit = store.fit ? store.looks.find((l) => l.id === store.fit!.lookId) : undefined
+  const who = fit ? store.people[fit.ownerId]?.name.trim() : ''
+  return (
+    <a className="inspo-strip" href="#/inspo">
+      {fit ? <img src={`/api/photo/${fit.id}/0`} alt="" /> : <span className="inspo-strip-art"><Sparkle size={26} /></span>}
+      <span>
+        <strong>{fit ? 'Fit of the week' : 'Inspo'}</strong>
+        <span>{fit ? `${who || 'Someone'} wearing ${fit.brands.slice(0, 2).join(' and ') || 'their best look'}` : 'See how people style their outfits, and post yours'}</span>
+      </span>
+    </a>
   )
 }

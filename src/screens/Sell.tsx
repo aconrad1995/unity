@@ -95,7 +95,7 @@ export default function Sell({ store }: { store: Store }) {
                 <span className="photo-drop-empty">
                   <CameraIcon />
                   <strong>Tap to add photos</strong>
-                  <span>Up to {MAX_PHOTOS}. Good light, plain background. The first one is the cover. You can skip this for now.</span>
+                  <span>Add a clear picture of the outfit you’re selling, taken in good lighting. Up to {MAX_PHOTOS} photos; the first one is the cover.</span>
                 </span>
                 <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => { void onPhotos(e.target.files); e.target.value = '' }} />
               </label>

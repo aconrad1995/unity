@@ -4,6 +4,7 @@ import { APP_NAME } from '../data'
 import { NO_ONE, nameOf, readProfile, type Store } from '../store'
 import { Avatar } from './ProfilePage'
 import { PageHeader } from './PageHeader'
+import { RoleBadge } from './Team'
 
 function when(at: number): string {
   const d = new Date(at)
@@ -34,7 +35,7 @@ export function ChatList({ store }: { store: Store }) {
                   <a className="chat-row" href={`#/chats/${c.user}`}>
                     <Avatar profile={person} size={56} />
                     <span className="chat-row-text">
-                      <strong>{nameOf(person)}</strong>
+                      <strong>{nameOf(person)} <RoleBadge role={store.roles[c.user]} /></strong>
                       <span className="chat-preview">{c.last.from === store.me ? 'You: ' : ''}{c.last.text}</span>
                     </span>
                     <span className="chat-row-side">
@@ -113,9 +114,10 @@ export function ChatThread({ store, user, listingId }: { store: Store; user: str
       <main className="page thread">
         {store.online === false && <Offline />}
 
-        {(person.photo || person.upFor.length > 0) && (
+        {(person.photo || person.upFor.length > 0 || store.roles[user]) && (
           <div className="thread-who">
             <Avatar profile={person} size={52} />
+            <RoleBadge role={store.roles[user]} />
             {person.upFor.length > 0 && <p className="seller-upfor">{name} is up for: {person.upFor.join(', ').toLowerCase()}</p>}
           </div>
         )}
