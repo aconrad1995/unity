@@ -1,0 +1,18 @@
+# Render setup for Unity. In Render: New > Blueprint, pick this repository, and it reads this file.
+services:
+  - type: web
+    name: unity
+    runtime: node
+    plan: starter            # a paid plan is needed because of the disk below
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: UNITY_DATA_DIR
+        value: /var/data     # listings, profiles and chats are kept here
+    disk:
+      name: unity-data
+      mountPath: /var/data
+      sizeGB: 1
