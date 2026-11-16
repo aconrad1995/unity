@@ -10,6 +10,7 @@ import { PageHeader } from './PageHeader'
 export default function ListingPage({ store, id }: { store: Store; id: string }) {
   const listing: Listing | undefined = store.listings.find((l) => l.id === id)
   const [note, setNote] = useState<'' | 'buy' | 'chat'>('')
+  const [shot, setShot] = useState(0)
   const [justListed] = useState(() => {
     try {
       return sessionStorage.getItem('unity.justListed') === id
@@ -60,9 +61,22 @@ export default function ListingPage({ store, id }: { store: Store; id: string })
         {justListed && (
           <p className="success" role="status"><Sparkle size={22} /> Your outfit is listed. This is how buyers will see it.</p>
         )}
-        <div className="detail-photo">
-          <ListingImage listing={listing} />
-          {listing.sample && <span className="sample-flag">Sample listing</span>}
+        <div className="detail-gallery">
+          <div className="detail-photo">
+            <ListingImage listing={listing} index={shot} />
+            {listing.sample && <span className="sample-flag">Sample listing</span>}
+          </div>
+          {(listing.photoCount ?? 0) > 1 && (
+            <ul className="thumbs" aria-label="More photos">
+              {Array.from({ length: listing.photoCount! }, (_, i) => (
+                <li key={i}>
+                  <button type="button" aria-label={`Show photo ${i + 1} of ${listing.photoCount}`} aria-current={i === shot ? 'true' : undefined} onClick={() => setShot(i)}>
+                    <img src={`/api/photo/${listing.id}/${i}`} alt="" loading="lazy" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <div className="detail-info">

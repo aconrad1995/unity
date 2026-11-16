@@ -1,4 +1,4 @@
-import type { ReactNode, SVGProps } from 'react'
+import { useId, type SVGProps } from 'react'
 import type { ArtKind, Listing } from './data'
 
 /* Icons: one stroke weight, drawn on a 24 grid. */
@@ -34,61 +34,127 @@ export const Sparkle = ({ size = 16, className }: { size?: number; className?: s
   </svg>
 )
 
-/* Illustrated stand-ins for outfit photos, used only by sample listings. */
-const SHAPES: Record<ArtKind, (fill: string, accent: string) => ReactNode> = {
-  top: (f, a) => (
-    <>
-      <path d="M62 78c10 8 20 12 38 12s28-4 38-12l14 26-12 8v46H60v-46l-12-8 14-26Z" fill={f} />
-      <path d="M60 150h80" stroke={a} strokeWidth="6" strokeLinecap="round" />
-    </>
-  ),
-  bottom: (f, a) => (
-    <>
-      <path d="M66 60h68l22 130h-44l-12-84-12 84H44L66 60Z" fill={f} />
-      <path d="M66 62h68" stroke={a} strokeWidth="8" strokeLinecap="round" />
-    </>
-  ),
-  bodysuit: (f, a) => (
-    <>
-      <path d="M74 50h12c2 16 26 16 28 0h12l6 46c-4 16-4 28 4 54l-24 40H88l-24-40c8-26 8-38 4-54l6-46Z" fill={f} />
-      <path d="M72 100h56" stroke={a} strokeWidth="6" strokeLinecap="round" />
-    </>
-  ),
-  bikini: (f, a) => (
-    <>
-      <path d="M100 70 68 112h30l2-42Zm0 0 32 42h-30l-2-42Z" fill={f} />
-      <path d="M60 148h80l-28 38H88l-28-38Z" fill={f} />
-      <path d="M68 112 52 96m80 16 16-16M100 70V52" stroke={a} strokeWidth="4" strokeLinecap="round" />
-    </>
-  ),
-  set: (f, a) => (
-    <>
-      <path d="M68 56c8 8 18 12 32 12s24-4 32-12l10 18-8 6v26H66V80l-8-6 10-18Z" fill={f} />
-      <path d="M68 126h64l18 60H50l18-60Z" fill={f} />
-      <path d="M68 128h64" stroke={a} strokeWidth="6" strokeLinecap="round" />
-    </>
-  ),
-  accessory: (f, a) => (
-    <>
-      <path d="M58 60h32l6 120c-12 8-32 8-44 0l6-120Zm52 0h32l6 120c-12 8-32 8-44 0l6-120Z" fill={f} />
-      <path d="M58 64h32m20 0h32" stroke={a} strokeWidth="8" strokeLinecap="round" />
-    </>
-  ),
+/* Illustrated stand-ins for outfit photos. Sample listings and outfits listed without a photo use these.
+   Each one gets a shaded garment, a glitter or stripe finish and a soft floor shadow. */
+const GARMENT: Record<ArtKind, { body: string[]; trim: { d: string; w: number }[] }> = {
+  top: {
+    body: ['M62 78c10 8 20 12 38 12s28-4 38-12l14 26-12 8v46H60v-46l-12-8 14-26Z'],
+    trim: [{ d: 'M60 150h80', w: 6 }],
+  },
+  bottom: {
+    body: ['M66 60h68l22 130h-44l-12-84-12 84H44L66 60Z'],
+    trim: [{ d: 'M66 62h68', w: 8 }],
+  },
+  bodysuit: {
+    body: ['M74 50h12c2 16 26 16 28 0h12l6 46c-4 16-4 28 4 54l-24 40H88l-24-40c8-26 8-38 4-54l6-46Z'],
+    trim: [{ d: 'M72 100h56', w: 6 }],
+  },
+  bikini: {
+    body: ['M100 70 68 112h30l2-42Zm0 0 32 42h-30l-2-42Z', 'M60 148h80l-28 38H88l-28-38Z'],
+    trim: [{ d: 'M68 112 52 96m80 16 16-16M100 70V52', w: 4 }],
+  },
+  set: {
+    body: ['M68 56c8 8 18 12 32 12s24-4 32-12l10 18-8 6v26H66V80l-8-6 10-18Z', 'M68 126h64l18 60H50l18-60Z'],
+    trim: [{ d: 'M68 128h64', w: 6 }],
+  },
+  accessory: {
+    body: ['M58 60h32l6 120c-12 8-32 8-44 0l6-120Zm52 0h32l6 120c-12 8-32 8-44 0l6-120Z'],
+    trim: [{ d: 'M58 64h32m20 0h32', w: 8 }],
+  },
 }
 
-export function ListingImage({ listing }: { listing: Listing }) {
-  if (listing.photo) return <img className="photo" src={listing.photo} alt={listing.title} />
+function mix(hex: string, to: string, t: number): string {
+  const n = (h: string, k: number) => parseInt(h.slice(1 + k * 2, 3 + k * 2), 16)
+  if (!/^#[0-9a-f]{6}$/i.test(hex) || !/^#[0-9a-f]{6}$/i.test(to)) return hex
+  const c = [0, 1, 2].map((k) => Math.round(n(hex, k) + (n(to, k) - n(hex, k)) * t).toString(16).padStart(2, '0'))
+  return `#${c.join('')}`
+}
+
+const hashOf = (text: string) => [...text].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7)
+
+export function ListingImage({ listing, index = 0 }: { listing: Listing; index?: number }) {
+  const uid = useId().replace(/\W/g, '')
+  if (listing.photoCount) {
+    return <img className="photo" src={`/api/photo/${listing.id}/${Math.min(index, listing.photoCount - 1)}`} alt={`${listing.title}, photo ${index + 1}`} loading="lazy" decoding="async" />
+  }
   const art = listing.art ?? { kind: 'set' as ArtKind, bg: '#FFE1EF', fill: '#FF7DB8', accent: '#FFFFFF' }
+  const shape = GARMENT[art.kind] ?? GARMENT.set
+  const finish = hashOf(listing.id) % 3 // 0 glitter, 1 holographic stripes, 2 sparkles
+  const light = mix(art.fill, '#FFFFFF', 0.45)
+  const deep = mix(art.fill, '#3B1F5E', 0.22)
+  const g = (name: string) => `${name}-${uid}`
   return (
     <svg className="photo" viewBox="0 0 200 240" role="img" aria-label={`Illustration of ${listing.title}`}>
-      <rect width="200" height="240" fill={art.bg} />
+      <defs>
+        <linearGradient id={g('bg')} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={mix(art.bg, '#FFFFFF', 0.55)} />
+          <stop offset="1" stopColor={art.bg} />
+        </linearGradient>
+        <radialGradient id={g('glow')} cx="0.5" cy="0.4" r="0.6">
+          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.85" />
+          <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id={g('cloth')} x1="0.1" y1="0" x2="0.9" y2="1">
+          <stop offset="0" stopColor={light} />
+          <stop offset="0.5" stopColor={art.fill} />
+          <stop offset="1" stopColor={deep} />
+        </linearGradient>
+        <linearGradient id={g('sheen')} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.6" />
+          <stop offset="0.38" stopColor="#FFFFFF" stopOpacity="0" />
+          <stop offset="0.7" stopColor="#FFFFFF" stopOpacity="0.18" />
+          <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+        </linearGradient>
+        <pattern id={g('finish')} width="22" height="22" patternUnits="userSpaceOnUse" patternTransform="rotate(12)">
+          {finish === 0 && (
+            <g fill="#FFFFFF">
+              <circle cx="4" cy="5" r="1.6" opacity="0.9" />
+              <circle cx="15" cy="9" r="1.1" opacity="0.8" />
+              <circle cx="9" cy="17" r="1.4" opacity="0.85" />
+              <circle cx="19" cy="19" r="0.9" opacity="0.7" />
+              <path d="M12 2c.3 1.300 1.200 2.200 2.500 2.500-1.300.3-2.200 1.200-2.500 2.500-.3-1.300-1.200-2.200-2.500-2.500 1.300-.3 2.200-1.200 2.500-2.500Z" opacity="0.9" />
+            </g>
+          )}
+          {finish === 1 && (
+            <g>
+              <rect width="22" height="5" fill="#FFFFFF" opacity="0.35" />
+              <rect y="8" width="22" height="3" fill={art.accent} opacity="0.4" />
+              <rect y="14" width="22" height="2" fill="#FFFFFF" opacity="0.25" />
+            </g>
+          )}
+          {finish === 2 && (
+            <g fill={art.accent}>
+              <path d="M6 3c.4 2.200 2 3.800 4.200 4.200-2.200.4-3.800 2-4.200 4.200-.4-2.200-2-3.800-4.200-4.200C4 6.800 5.600 5.200 6 3Z" opacity="0.85" />
+              <circle cx="17" cy="15" r="1.800" opacity="0.7" />
+            </g>
+          )}
+        </pattern>
+      </defs>
+
+      <rect width="200" height="240" fill={`url(#${g('bg')})`} />
+      <rect width="200" height="240" fill={`url(#${g('glow')})`} />
       <g fill="#FFFFFF" opacity="0.9">
         <path d={STAR} transform="translate(22 62) scale(0.7)" />
         <path d={STAR} transform="translate(164 78) scale(0.5)" />
         <path d={STAR} transform="translate(150 196) scale(1)" />
         <path d={STAR} transform="translate(24 158) scale(0.5)" />
       </g>
-      {SHAPES[art.kind](art.fill, art.accent)}
+      <ellipse cx="100" cy="214" rx="54" ry="7" fill="#3B1F5E" opacity="0.12" />
+
+      <g strokeLinejoin="round" strokeLinecap="round">
+        {shape.body.map((d) => (
+          <g key={d}>
+            <path d={d} fill={`url(#${g('cloth')})`} />
+            <path d={d} fill={`url(#${g('finish')})`} opacity="0.85" />
+            <path d={d} fill={`url(#${g('sheen')})`} />
+            <path d={d} fill="none" stroke={deep} strokeOpacity="0.45" strokeWidth="1.5" />
+          </g>
+        ))}
+        {shape.trim.map((t) => (
+          <path key={t.d} d={t.d} fill="none" stroke={art.accent} strokeWidth={t.w} />
+        ))}
+      </g>
+      <path d={STAR} transform="translate(120 90) scale(0.55)" fill="#FFFFFF" opacity="0.95" />
     </svg>
   )
 }

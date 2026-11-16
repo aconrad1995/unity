@@ -22,6 +22,12 @@ function serveFile(req, res) {
   // Built files have a unique name per version, so browsers may keep them; the page itself is always fresh.
   res.setHeader('Cache-Control', file.includes(`${DIST}/assets/`) ? 'public, max-age=31536000, immutable' : 'no-cache')
   res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('Referrer-Policy', 'same-origin')
+  res.setHeader('X-Frame-Options', 'DENY')
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+  )
   createReadStream(file).pipe(res)
 }
 

@@ -50,7 +50,8 @@ export interface Listing {
   ownerId?: string
   sample: boolean
   createdAt: number
-  photo?: string
+  /** How many pictures the seller added. Each loads from /api/photo/<id>/<number>. */
+  photoCount?: number
   art?: { kind: ArtKind; bg: string; fill: string; accent: string }
 }
 

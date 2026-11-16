@@ -46,36 +46,61 @@ function deviceKey(): string {
 }
 
 export interface Person { name: string; photo: string; upFor: string[] }
-export interface Message { id: string; from: string; to: string; text: string; listingId?: string; at: number }
+export interface Message { id: string; from: string; to: string; text: string; listingId?: string; at: number; state?: 'sending' | 'failed' | 'rejected'; why?: string }
 interface Shared { rev: number; me: string; listings: Listing[]; people: Record<string, Person>; messages: Message[]; blocked: string[] }
 const NOTHING: Shared = { rev: 0, me: '', listings: [], people: {}, messages: [], blocked: [] }
 
 export const NO_ONE: Person = { name: '', photo: '', upFor: [] }
 export const nameOf = (p: Person | undefined) => p?.name.trim() || 'Someone new'
 
-async function call(method: string, path: string, body?: unknown): Promise<(Shared & { same?: boolean; id?: string }) | null> {
+type Reply = { status: number; error?: string; data: (Shared & { same?: boolean; id?: string }) | null }
+
+async function call(method: string, path: string, body?: unknown): Promise<Reply> {
   try {
     const res = await fetch(`/api/${path}`, {
       method,
       headers: { 'x-unity-key': deviceKey(), ...(body ? { 'Content-Type': 'application/json' } : {}) },
       body: body ? JSON.stringify(body) : undefined,
     })
-    if (!res.ok || !res.headers.get('content-type')?.includes('json')) return null
-    return await res.json()
+    const json = res.headers.get('content-type')?.includes('json') ? await res.json().catch(() => null) : null
+    return { status: res.status, error: json?.error, data: res.ok ? json : null }
   } catch {
-    return null
+    return { status: 0, data: null }
   }
 }
+const fetchData = async (method: string, path: string, body?: unknown) => (await call(method, path, body)).data
 
 const samePerson = (a: Person | undefined, b: Person) =>
   !!a && a.name === b.name && a.photo === b.photo && a.upFor.join('|') === b.upFor.join('|')
+
+/* ---------- Outgoing messages ----------
+   A message shows in the chat the moment it is sent. It is kept on this device until the server
+   confirms it, so a dropped connection never loses it, and it is retried automatically. Every
+   message has its own id, so a retry can never post it twice. */
+const OUTBOX_KEY = 'unity.outbox.v1'
+const newId = () =>
+  typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('')
+
+const WHY: Record<string, string> = {
+  rate_limited: 'You are sending a lot of messages. Wait a minute, then try again.',
+  you_blocked: 'You blocked this person. Unblock them to message again.',
+  unknown_person: 'This person can’t be messaged.',
+}
 
 export function useStore() {
   const [shared, setShared] = useState<Shared>(NOTHING)
   const [online, setOnline] = useState<boolean | null>(null)
   const [saved, setSaved] = useState<string[]>(() => read<string[]>(SAVED_KEY, []))
   const [readAt, setReadAt] = useState<Record<string, number>>(() => read<Record<string, number>>(READ_KEY, {}))
+  const [outbox, setOutbox] = useState<Message[]>(() =>
+    read<Message[]>(OUTBOX_KEY, []).map((m) => ({ ...m, state: m.state === 'rejected' ? 'rejected' : 'failed' })),
+  )
   const latest = useRef(NOTHING)
+  const outboxRef = useRef(outbox)
+  const inflight = useRef(new Set<string>())
+  outboxRef.current = outbox
 
   const take = useCallback((next: Shared | null) => {
     if (!next) return false
@@ -85,6 +110,28 @@ export function useStore() {
   }, [])
 
   useEffect(() => {
+    write(OUTBOX_KEY, outbox)
+  }, [outbox])
+
+  const deliver = useCallback(async (m: Message) => {
+    if (inflight.current.has(m.id)) return false
+    inflight.current.add(m.id)
+    setOutbox((cur) => cur.map((x) => (x.id === m.id ? { ...x, state: 'sending', why: undefined } : x)))
+    const r = await call('POST', 'messages', { id: m.id, to: m.to, text: m.text, listingId: m.listingId })
+    inflight.current.delete(m.id)
+    if (r.data) {
+      take(r.data)
+      setOutbox((cur) => cur.filter((x) => x.id !== m.id))
+      return true
+    }
+    // A refusal from the server will not get better by retrying; a dropped connection or a busy server will.
+    const refused = r.status >= 400 && r.status < 500 && r.status !== 429 && r.status !== 401
+    const why = WHY[r.error ?? ''] ?? (refused ? 'This message could not be sent.' : 'Not sent. Check your connection.')
+    setOutbox((cur) => cur.map((x) => (x.id === m.id ? { ...x, state: refused || r.error === 'rate_limited' ? 'rejected' : 'failed', why } : x)))
+    return false
+  }, [take])
+
+  useEffect(() => {
     let stopped = false
     let busy = false
     async function tick() {
@@ -92,21 +139,23 @@ export function useStore() {
       busy = true
       const got = await call('GET', `sync?rev=${latest.current.rev}`)
       if (stopped) return
-      setOnline(got !== null)
-      if (got && !got.same) take(got)
-      if (got) {
+      setOnline(got.data !== null)
+      if (got.data && !got.data.same) take(got.data)
+      if (got.data) {
+        // Messages that did not go through earlier are tried again now that the server answers.
+        for (const m of outboxRef.current) if (m.state === 'failed') void deliver(m)
         // Listings made before the shared shop existed: move them over once.
         const old = read<Listing[]>(LISTINGS_KEY, [])
         if (old.length > 0) {
           let moved = true
-          for (const l of old) moved = take(await call('POST', 'listings', l)) && moved
+          for (const l of old) moved = take(await fetchData('POST', 'listings', l)) && moved
           if (moved) localStorage.removeItem(LISTINGS_KEY)
         }
         // Keep the public part of the profile (name, picture, "say hi about") up to date.
         const p = readProfile()
         const mine: Person = { name: p.name.trim(), photo: p.photo, upFor: p.upFor }
         const known = latest.current.people[latest.current.me]
-        if (!samePerson(known, mine) && (known || mine.name || mine.photo || mine.upFor.length > 0)) take(await call('PUT', 'me', mine))
+        if (!samePerson(known, mine) && (known || mine.name || mine.photo || mine.upFor.length > 0)) take(await fetchData('PUT', 'me', mine))
       }
       busy = false
     }
@@ -116,7 +165,7 @@ export function useStore() {
       stopped = true
       window.clearInterval(timer)
     }
-  }, [take])
+  }, [take, deliver])
 
   useEffect(() => {
     write(SAVED_KEY, saved)
@@ -126,23 +175,30 @@ export function useStore() {
   const mine = useMemo(() => shared.listings.filter((l) => l.ownerId === shared.me), [shared.listings, shared.me])
 
   /** Returns the new listing's id, or '' when it could not be saved. */
-  const addListing = useCallback(async (listing: Listing): Promise<string> => {
-    const got = await call('POST', 'listings', listing)
-    return take(got) ? got!.id ?? '' : ''
+  const addListing = useCallback(async (listing: Listing, photos: string[] = []): Promise<string> => {
+    const got = await fetchData('POST', 'listings', { ...listing, photos })
+    return take(got) ? (got as { id?: string }).id ?? '' : ''
   }, [take])
 
-  const removeListing = useCallback(async (id: string) => take(await call('DELETE', `listings/${id}`)), [take])
+  const removeListing = useCallback(async (id: string) => take(await fetchData('DELETE', `listings/${id}`)), [take])
 
   const toggleSaved = useCallback((id: string) => {
     setSaved((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [id, ...cur]))
   }, [])
 
-  const sendMessage = useCallback(
-    async (to: string, text: string, listingId?: string) => take(await call('POST', 'messages', { to, text, listingId })),
-    [take],
-  )
-  const setBlocked = useCallback(async (user: string, on: boolean) => take(await call('POST', 'block', { user, on })), [take])
-  const report = useCallback(async (user: string, reason: string) => take(await call('POST', 'report', { user, reason })), [take])
+  const sendMessage = useCallback((to: string, text: string, listingId?: string) => {
+    const m: Message = { id: newId(), from: latest.current.me, to, text, listingId, at: Date.now(), state: 'sending' }
+    setOutbox((cur) => [...cur, m])
+    void deliver(m)
+  }, [deliver])
+  const retryMessage = useCallback((id: string) => {
+    const m = outboxRef.current.find((x) => x.id === id)
+    if (m) void deliver(m)
+  }, [deliver])
+  const discardMessage = useCallback((id: string) => setOutbox((cur) => cur.filter((x) => x.id !== id)), [])
+
+  const setBlocked = useCallback(async (user: string, on: boolean) => take(await fetchData('POST', 'block', { user, on })), [take])
+  const report = useCallback(async (user: string, reason: string) => take(await fetchData('POST', 'report', { user, reason })), [take])
 
   const markRead = useCallback((user: string) => {
     setReadAt((cur) => {
@@ -152,12 +208,13 @@ export function useStore() {
     })
   }, [])
 
-  /** One chat per person, newest first. */
+  /** One chat per person, newest first. Messages still waiting to go out are shown at the end. */
   const chats = useMemo(() => {
+    const confirmed = new Set(shared.messages.map((m) => m.id))
     const by = new Map<string, Message[]>()
-    for (const m of shared.messages) {
-      const other = m.from === shared.me ? m.to : m.from
-      by.set(other, [...(by.get(other) ?? []), m])
+    for (const m of [...shared.messages, ...outbox.filter((o) => !confirmed.has(o.id))]) {
+      const other = m.state || m.from === shared.me ? m.to : m.from
+      by.set(other, [...(by.get(other) ?? []), m.state ? { ...m, from: shared.me } : m])
     }
     return [...by.entries()]
       .map(([user, messages]) => ({
@@ -167,12 +224,12 @@ export function useStore() {
         unread: messages.filter((m) => m.from === user && m.at > (readAt[user] ?? 0)).length,
       }))
       .sort((a, b) => b.last.at - a.last.at)
-  }, [shared.messages, shared.me, readAt])
+  }, [shared.messages, shared.me, readAt, outbox])
   const unread = chats.reduce((n, c) => n + c.unread, 0)
 
   return {
     listings, mine, saved, online, me: shared.me, people: shared.people, blocked: shared.blocked, chats, unread,
-    addListing, removeListing, toggleSaved, sendMessage, setBlocked, report, markRead,
+    addListing, removeListing, toggleSaved, sendMessage, retryMessage, discardMessage, setBlocked, report, markRead,
   }
 }
 

@@ -1,11 +1,13 @@
 import { useState, type FormEvent } from 'react'
-import { CameraIcon, CheckIcon } from '../art'
+import { CameraIcon, CheckIcon, CloseIcon, PlusIcon } from '../art'
 import { APP_NAME, ART_FOR_CATEGORY, BRANDS, cleanBrand, CATEGORIES, CONDITIONS, SIZES, type Category, type ConditionId, type Listing, type Size } from '../data'
 import { shrinkPhoto, type Store } from '../store'
 import { PageHeader } from './PageHeader'
 
+const MAX_PHOTOS = 5
+
 export default function Sell({ store }: { store: Store }) {
-  const [photo, setPhoto] = useState('')
+  const [photos, setPhotos] = useState<string[]>([])
   const [title, setTitle] = useState('')
   const [brand, setBrand] = useState('')
   const [category, setCategory] = useState<Category | ''>('')
@@ -16,14 +18,26 @@ export default function Sell({ store }: { store: Store }) {
   const [sending, setSending] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  async function onPhoto(file: File | undefined) {
-    if (!file) return
-    try {
-      setPhoto(await shrinkPhoto(file))
-      setErrors((e) => ({ ...e, photo: '' }))
-    } catch {
-      setErrors((e) => ({ ...e, photo: 'That file could not be opened. Try a JPG or PNG photo.' }))
+  async function onPhotos(files: FileList | null) {
+    if (!files || files.length === 0) return
+    const room = MAX_PHOTOS - photos.length
+    const added: string[] = []
+    let unreadable = 0
+    for (const file of Array.from(files).slice(0, room)) {
+      try {
+        added.push(await shrinkPhoto(file))
+      } catch {
+        unreadable++
+      }
     }
+    setPhotos((cur) => [...cur, ...added].slice(0, MAX_PHOTOS))
+    const skipped = files.length - room
+    setErrors((e) => ({
+      ...e,
+      photo: unreadable > 0
+        ? 'One of those files could not be opened. Try a JPG or PNG photo.'
+        : skipped > 0 ? `You can add up to ${MAX_PHOTOS} photos, so the extras were left out.` : '',
+    }))
   }
 
   async function submit(e: FormEvent) {
@@ -54,11 +68,10 @@ export default function Sell({ store }: { store: Store }) {
       seller: 'You',
       sample: false,
       createdAt: Date.now(),
-      photo: photo || undefined,
-      art: photo ? undefined : { kind: ART_FOR_CATEGORY[category], bg: '#FFE1EF', fill: '#6BC1FF', accent: '#FFFFFF' },
+      art: photos.length > 0 ? undefined : { kind: ART_FOR_CATEGORY[category], bg: '#FFE1EF', fill: '#6BC1FF', accent: '#FFFFFF' },
     }
     setSending(true)
-    const newId = await store.addListing(listing)
+    const newId = await store.addListing(listing, photos)
     setSending(false)
     if (!newId) {
       setErrors({ form: `Your outfit could not be saved because ${APP_NAME} could not be reached. Check your connection and try again.` })
@@ -76,18 +89,38 @@ export default function Sell({ store }: { store: Store }) {
       <main className="page">
         <form className="sell" onSubmit={submit} noValidate>
           <fieldset className="step">
-            <legend><span className="step-n">1</span> Add a photo</legend>
-            <label className={`photo-drop${photo ? ' has-photo' : ''}`}>
-              {photo ? <img src={photo} alt="Your outfit" /> : (
+            <legend><span className="step-n">1</span> Add your photos</legend>
+            {photos.length === 0 ? (
+              <label className="photo-drop">
                 <span className="photo-drop-empty">
                   <CameraIcon />
-                  <strong>Tap to add a photo</strong>
-                  <span>Good light, plain background. You can skip this for now.</span>
+                  <strong>Tap to add photos</strong>
+                  <span>Up to {MAX_PHOTOS}. Good light, plain background. The first one is the cover. You can skip this for now.</span>
                 </span>
-              )}
-              <input type="file" accept="image/*" className="sr-only" onChange={(e) => onPhoto(e.target.files?.[0])} />
-            </label>
-            {photo && <button type="button" className="link-btn" onClick={() => setPhoto('')}>Remove photo</button>}
+                <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => { void onPhotos(e.target.files); e.target.value = '' }} />
+              </label>
+            ) : (
+              <ul className="photo-grid" aria-label="Your photos">
+                {photos.map((p, i) => (
+                  <li key={p.slice(-40) + i} className="photo-tile">
+                    <img src={p} alt={`Photo ${i + 1}`} />
+                    {i === 0 ? <span className="cover-tag">Cover</span> : (
+                      <button type="button" className="cover-btn" onClick={() => setPhotos((cur) => [cur[i], ...cur.filter((_, j) => j !== i)])}>Make cover</button>
+                    )}
+                    <button type="button" className="tile-x" aria-label={`Remove photo ${i + 1}`} onClick={() => setPhotos((cur) => cur.filter((_, j) => j !== i))}><CloseIcon /></button>
+                  </li>
+                ))}
+                {photos.length < MAX_PHOTOS && (
+                  <li className="photo-tile photo-add">
+                    <label>
+                      <PlusIcon />
+                      <span>Add more</span>
+                      <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => { void onPhotos(e.target.files); e.target.value = '' }} />
+                    </label>
+                  </li>
+                )}
+              </ul>
+            )}
             {err('photo')}
           </fieldset>
 

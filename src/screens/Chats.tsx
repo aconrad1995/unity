@@ -62,8 +62,6 @@ export function ChatList({ store }: { store: Store }) {
 
 export function ChatThread({ store, user, listingId }: { store: Store; user: string; listingId?: string }) {
   const [draft, setDraft] = useState('')
-  const [problem, setProblem] = useState('')
-  const [sending, setSending] = useState(false)
   const [reason, setReason] = useState('')
   const [reported, setReported] = useState(false)
 
@@ -95,19 +93,13 @@ export function ChatThread({ store, user, listingId }: { store: Store; user: str
     )
   }
 
-  async function send(e: FormEvent) {
+  function send(e: FormEvent) {
     e.preventDefault()
     const text = draft.trim()
-    if (!text || sending) return
-    setSending(true)
-    const ok = await store.sendMessage(user, text, messages.length === 0 || listingId ? aboutId : undefined)
-    setSending(false)
-    if (ok) {
-      setDraft('')
-      setProblem('')
-    } else {
-      setProblem('Your message could not be sent. Try again in a moment.')
-    }
+    if (!text) return
+    // It shows in the chat straight away and is kept until the server confirms it.
+    store.sendMessage(user, text, messages.length === 0 || listingId ? aboutId : undefined)
+    setDraft('')
   }
 
   const starters = [
@@ -144,7 +136,15 @@ export function ChatThread({ store, user, listingId }: { store: Store; user: str
             {messages.map((m) => (
               <li key={m.id} className={m.from === store.me ? 'msg msg-me' : 'msg'}>
                 <p>{m.text}</p>
-                <time dateTime={new Date(m.at).toISOString()}>{m.from === store.me ? 'You' : name} · {when(m.at)}</time>
+                {m.state === 'sending' && <span className="msg-state">Sending…</span>}
+                {(m.state === 'failed' || m.state === 'rejected') && (
+                  <span className="msg-state msg-bad" role="alert">
+                    {m.why ?? 'Not sent.'}{' '}
+                    {m.state === 'failed' && <button type="button" className="link-btn" onClick={() => store.retryMessage(m.id)}>Try again</button>}
+                    <button type="button" className="link-btn" onClick={() => store.discardMessage(m.id)}>Delete</button>
+                  </span>
+                )}
+                {!m.state && <time dateTime={new Date(m.at).toISOString()}>{m.from === store.me ? 'You' : name} · {when(m.at)}</time>}
               </li>
             ))}
           </ol>
@@ -166,12 +166,12 @@ export function ChatThread({ store, user, listingId }: { store: Store; user: str
                 ))}
               </div>
             )}
-            {problem && <p className="error" role="alert">{problem}</p>}
             <form className="composer" onSubmit={send}>
               <label className="sr-only" htmlFor="chat-draft">Write a message to {name}</label>
               <input id="chat-draft" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Write a message" maxLength={1000} autoComplete="off" />
-              <button type="submit" className="send" disabled={!draft.trim() || sending} aria-label="Send message"><SendIcon /></button>
+              <button type="submit" className="send" disabled={!draft.trim()} aria-label="Send message"><SendIcon /></button>
             </form>
+            {draft.length > 800 && <p className="hint counter" aria-live="polite">{draft.length} of 1000</p>}
           </div>
         )}
 
