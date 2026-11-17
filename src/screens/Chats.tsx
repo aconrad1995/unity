@@ -20,7 +20,7 @@ export function ChatList({ store }: { store: Store }) {
   const nameless = !readProfile().name.trim()
   return (
     <>
-      <PageHeader title="Chats" />
+      <PageHeader title="Chats" noBack />
       <main className="page chats">
         {store.online === false && <Offline />}
         {nameless && store.chats.length > 0 && (
@@ -30,12 +30,15 @@ export function ChatList({ store }: { store: Store }) {
           <ul className="chat-list">
             {store.chats.map((c) => {
               const person = store.people[c.user] ?? NO_ONE
+              const topic = [...c.messages].reverse().find((m) => m.about || m.listingId)
+              const topicName = topic && (store.listings.find((l) => l.id === topic.listingId)?.title ?? topic.about)
               return (
                 <li key={c.user}>
                   <a className="chat-row" href={`#/chats/${c.user}`}>
                     <Avatar profile={person} size={56} />
                     <span className="chat-row-text">
                       <strong>{nameOf(person)} <RoleBadge role={store.roles[c.user]} /></strong>
+                      {topicName && <span className="chat-topic">About {topicName}</span>}
                       <span className="chat-preview">{c.last.from === store.me ? 'You: ' : ''}{c.last.text}</span>
                     </span>
                     <span className="chat-row-side">
@@ -71,8 +74,12 @@ export function ChatThread({ store, user, listingId }: { store: Store; user: str
   const chat = store.chats.find((c) => c.user === user)
   const messages = chat?.messages ?? []
   const isBlocked = store.blocked.includes(user)
-  const aboutId = listingId ?? [...messages].reverse().find((m) => m.listingId)?.listingId
+  const lastTopic = [...messages].reverse().find((m) => m.listingId)
+  const aboutId = listingId ?? lastTopic?.listingId
   const about = aboutId ? store.listings.find((l) => l.id === aboutId) : undefined
+  // The outfit may have been sold and removed; its name was kept with the messages.
+  const goneTitle = !about && aboutId ? messages.find((m) => m.listingId === aboutId && m.about)?.about : undefined
+  const topicOf = (id?: string) => (id ? store.listings.find((l) => l.id === id)?.title ?? messages.find((m) => m.listingId === id && m.about)?.about : undefined)
 
   useEffect(() => {
     store.markRead(user)
@@ -128,15 +135,23 @@ export function ChatThread({ store, user, listingId }: { store: Store; user: str
             <span>
               <span className="hint">Chatting about</span>
               <strong>{about.title}</strong>
-              <span>${about.price} · {about.brand} · {about.size}</span>
+              <span>${about.price} · {about.brand} · {about.size}{about.status ? ` · ${about.status === 'sold' ? 'Sold' : 'Reserved'}` : ''}</span>
             </span>
           </a>
+        )}
+        {goneTitle && (
+          <p className="thread-about thread-about-gone"><span><span className="hint">Chatting about</span><strong>{goneTitle}</strong><span>No longer listed</span></span></p>
         )}
 
         {messages.length > 0 ? (
           <ol className="msgs" aria-label={`Messages with ${name}`}>
-            {messages.map((m) => (
+            {messages.map((m, i) => {
+              // When a chat moves on to a different outfit, a small marker says which one.
+              const prevTopic = messages.slice(0, i).reverse().find((x) => x.listingId)?.listingId
+              const topic = m.listingId && m.listingId !== prevTopic && (i > 0 || messages.some((x) => x.listingId && x.listingId !== m.listingId)) ? topicOf(m.listingId) : undefined
+              return (
               <li key={m.id} className={m.from === store.me ? 'msg msg-me' : 'msg'}>
+                {topic && <span className="msg-topic">About {topic}</span>}
                 <p>{m.text}</p>
                 {m.state === 'sending' && <span className="msg-state">Sending…</span>}
                 {(m.state === 'failed' || m.state === 'rejected') && (
@@ -148,7 +163,8 @@ export function ChatThread({ store, user, listingId }: { store: Store; user: str
                 )}
                 {!m.state && <time dateTime={new Date(m.at).toISOString()}>{m.from === store.me ? 'You' : name} · {when(m.at)}</time>}
               </li>
-            ))}
+              )
+            })}
           </ol>
         ) : (
           !isBlocked && <p className="thread-start">Say hi to {name}. Only the two of you can see this chat.</p>

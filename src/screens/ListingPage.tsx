@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { ListingImage, Sparkle } from '../art'
-import { APP_NAME, CONDITIONS, featuredFor, type Listing } from '../data'
+import { CONDITIONS, SIZES, featuredFor, type ConditionId, type Listing, type Size } from '../data'
 import { NO_ONE, bumpStat, nameOf, type Store } from '../store'
 import { Avatar } from './ProfilePage'
 import { noteListing } from '../taste'
@@ -10,7 +10,8 @@ import { PageHeader } from './PageHeader'
 
 export default function ListingPage({ store, id }: { store: Store; id: string }) {
   const listing: Listing | undefined = store.listings.find((l) => l.id === id)
-  const [note, setNote] = useState<'' | 'buy' | 'chat'>('')
+  const [note, setNote] = useState<'' | 'chat'>('')
+  const [editing, setEditing] = useState(false)
   const [shot, setShot] = useState(0)
   const [justListed] = useState(() => {
     try {
@@ -33,7 +34,8 @@ export default function ListingPage({ store, id }: { store: Store; id: string })
   }, [sponsor])
 
   useEffect(() => {
-    if (listing && listing.sample) noteListing(listing, 1)
+    // Every outfit opened teaches "Picked for you" a little about this shopper's taste.
+    if (listing) noteListing(listing, 1)
   }, [listing?.id])
 
   if (!listing) {
@@ -60,12 +62,16 @@ export default function ListingPage({ store, id }: { store: Store; id: string })
       <PageHeader title={listing.brand} />
       <main className="page detail">
         {justListed && (
-          <p className="success" role="status"><Sparkle size={22} /> Your outfit is listed. This is how buyers will see it.</p>
+          <div className="success listed-next" role="status">
+            <p><Sparkle size={22} /> Your outfit is listed. This is how buyers will see it.</p>
+            <a className="btn" href="#/sell">List another outfit</a>
+          </div>
         )}
         <div className="detail-gallery">
           <div className="detail-photo">
             <ListingImage listing={listing} index={shot} />
             {listing.sample && <span className="sample-flag">Sample listing</span>}
+            {listing.status && <span className={`status-flag status-${listing.status}`}>{listing.status === 'sold' ? 'Sold' : 'Reserved'}</span>}
           </div>
           {(listing.photoCount ?? 0) > 1 && (
             <ul className="thumbs" aria-label="More photos">
@@ -111,22 +117,41 @@ export default function ListingPage({ store, id }: { store: Store; id: string })
             <p className="detail-seller">Sold by {listing.seller}</p>
           )}
 
-          <div className="actions">
-            {!isMine && <button type="button" className="btn btn-wide" onClick={() => setNote('buy')}>Buy now</button>}
-            <div className="actions-row">
-              {!isMine && (listing.ownerId
-                ? <a className="btn btn-soft" href={`#/chats/${listing.ownerId}/${listing.id}`}>Message seller</a>
-                : <button type="button" className="btn btn-soft" onClick={() => setNote('chat')}>Message seller</button>)}
-              <SaveButton store={store} id={listing.id} big />
+          {isMine ? (
+            editing
+              ? <EditListing store={store} listing={listing} done={() => setEditing(false)} />
+              : (
+                <div className="actions seller-tools">
+                  <button type="button" className="btn btn-wide" onClick={() => setEditing(true)}>Edit details or price</button>
+                  <div className="actions-row">
+                    {listing.status === 'sold'
+                      ? <button type="button" className="btn btn-soft" onClick={() => store.editListing(listing.id, { status: null })}>Not sold after all</button>
+                      : <button type="button" className="btn btn-soft" onClick={() => store.editListing(listing.id, { status: 'sold' })}>Mark as sold</button>}
+                    {listing.status !== 'sold' && (listing.status === 'reserved'
+                      ? <button type="button" className="btn btn-soft" onClick={() => store.editListing(listing.id, { status: null })}>Not reserved</button>
+                      : <button type="button" className="btn btn-soft" onClick={() => store.editListing(listing.id, { status: 'reserved' })}>Mark reserved</button>)}
+                  </div>
+                  <p className="hint">Sold outfits leave the shop after a day and stay in your closet. Chats about them are kept.</p>
+                </div>
+              )
+          ) : (
+            <div className="actions">
+              {listing.status === 'sold' ? (
+                <p className="notice">This outfit has sold. Save it to find similar ones, or message the seller about other pieces.</p>
+              ) : listing.ownerId ? (
+                // Paying inside the app isn't switched on yet, so buying starts as a chat with the seller.
+                <a className="btn btn-wide" href={`#/chats/${listing.ownerId}/${listing.id}`}>Message seller to buy</a>
+              ) : (
+                <button type="button" className="btn btn-wide" onClick={() => setNote('chat')}>Message seller to buy</button>
+              )}
+              <div className="actions-row">
+                <SaveButton store={store} id={listing.id} big />
+              </div>
+              {note && (
+                <p className="notice" role="status">This is a sample listing, so there is no real seller to message. Outfits listed by real people can be messaged.</p>
+              )}
             </div>
-            {note && (
-              <p className="notice" role="status">
-                {note === 'buy'
-                  ? `Checkout isn’t switched on yet. This is a preview of ${APP_NAME}, so nothing can be bought for real.`
-                  : 'This is a sample listing, so there is no real seller to message. Outfits listed by real people can be messaged.'}
-              </p>
-            )}
-          </div>
+          )}
 
           {sponsor && (
             <div className="buy-new">
@@ -174,5 +199,59 @@ export default function ListingPage({ store, id }: { store: Store; id: string })
         </div>
       </main>
     </>
+  )
+}
+
+/** The seller changes the name, price, size, condition or description without listing it again. */
+function EditListing({ store, listing, done }: { store: Store; listing: Listing; done: () => void }) {
+  const [title, setTitle] = useState(listing.title)
+  const [price, setPrice] = useState(String(listing.price))
+  const [size, setSize] = useState<Size>(listing.size)
+  const [condition, setCondition] = useState<ConditionId>(listing.condition)
+  const [description, setDescription] = useState(listing.description === 'No description added.' ? '' : listing.description)
+  const [problem, setProblem] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function save(e: FormEvent) {
+    e.preventDefault()
+    const amount = Math.round(Number(price))
+    if (!title.trim()) return setProblem('Give your outfit a short name.')
+    if (!(amount >= 1 && amount <= 10000)) return setProblem('Enter a price between $1 and $10,000.')
+    setBusy(true)
+    const why = await store.editListing(listing.id, { title: title.trim(), price: amount, size, condition, description: description.trim() || 'No description added.' })
+    setBusy(false)
+    if (why) setProblem(why)
+    else done()
+  }
+
+  return (
+    <form className="step edit-listing" onSubmit={save}>
+      <h2 className="section-h section-h-in">Edit your outfit</h2>
+      <label className="field"><span>Name</span><input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={60} /></label>
+      <label className="field price-field">
+        <span>Price in dollars</span>
+        <span className="price-input"><span aria-hidden="true">$</span>
+          <input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, '').slice(0, 7))} />
+        </span>
+      </label>
+      <div className="field" role="group" aria-labelledby="edit-size-l">
+        <span id="edit-size-l">Size</span>
+        <div className="bubbles bubbles-wrap">
+          {SIZES.map((s) => <button key={s} type="button" className="bubble" aria-pressed={size === s} onClick={() => setSize(s)}>{s}</button>)}
+        </div>
+      </div>
+      <div className="field" role="group" aria-labelledby="edit-cond-l">
+        <span id="edit-cond-l">How worn is it?</span>
+        <div className="bubbles bubbles-wrap">
+          {CONDITIONS.map((c) => <button key={c.id} type="button" className="bubble bubble-blue" aria-pressed={condition === c.id} onClick={() => setCondition(c.id)}>{c.label}</button>)}
+        </div>
+      </div>
+      <label className="field"><span>Anything buyers should know?</span><textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} maxLength={400} /></label>
+      {problem && <p className="error" role="alert">{problem}</p>}
+      <div className="actions-row">
+        <button type="submit" className="btn" disabled={busy}>{busy ? 'Saving' : 'Save changes'}</button>
+        <button type="button" className="btn btn-soft" onClick={done}>Cancel</button>
+      </div>
+    </form>
   )
 }

@@ -71,7 +71,7 @@ export function InspoPage({ store }: { store: Store }) {
           </section>
         )}
 
-        <section aria-labelledby="latest-h">
+        {(rest.length > 0 || store.looks.length === 0) && <section aria-labelledby="latest-h">
           <h2 id="latest-h" className="section-h">Latest looks</h2>
           {rest.length > 0 ? (
             <ul className="look-grid">
@@ -84,7 +84,7 @@ export function InspoPage({ store }: { store: Store }) {
               <a className="btn" href="#/inspo/new">Post your look</a>
             </div>
           )}
-        </section>
+        </section>}
         <p className="fineprint">No likes, no follower counts. Just outfits worth stealing ideas from.</p>
       </main>
     </>

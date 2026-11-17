@@ -44,6 +44,7 @@ export function Card({ listing, store }: { listing: Listing; store: Store }) {
           <ListingImage listing={listing} />
           <span className="price-bubble">${listing.price}</span>
           {listing.sample && <span className="sample-flag">Sample</span>}
+          {listing.status && <span className={`status-flag status-${listing.status}`}>{listing.status === 'sold' ? 'Sold' : 'Reserved'}</span>}
         </div>
         <div className="card-body">
           <p className="card-brand">{listing.brand}</p>
@@ -54,7 +55,7 @@ export function Card({ listing, store }: { listing: Listing; store: Store }) {
           </p>
         </div>
       </a>
-      <SaveButton store={store} id={listing.id} />
+      {listing.ownerId !== store.me && <SaveButton store={store} id={listing.id} />}
     </li>
   )
 }

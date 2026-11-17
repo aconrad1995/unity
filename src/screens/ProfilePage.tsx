@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CameraIcon, CloseIcon, Sparkle } from '../art'
 import { APP_NAME, BRANDS, SIZES, UP_FOR, VIBES, cleanBrand } from '../data'
-import { shrinkPhoto, useProfile, type Store } from '../store'
+import { applyMoveCode, moveCode, shrinkPhoto, useProfile, type Store } from '../store'
 import { readTaste, resetTaste, topOf } from '../taste'
 import { Card } from './Card'
 import { PageHeader } from './PageHeader'
@@ -53,6 +53,11 @@ export default function ProfilePage({ store }: { store: Store }) {
     ['Searches', topOf(taste.words)],
   ].filter(([, list]) => list.length > 0) as [string, string[]][]
 
+  // "#/you/prefs" (from New for you) opens straight at the brands and sizes.
+  useEffect(() => {
+    if (window.location.hash.endsWith('/prefs')) setTimeout(() => document.getElementById('prefs-h')?.scrollIntoView({ block: 'start' }), 60)
+  }, [])
+
   async function onPhoto(file: File | undefined) {
     if (!file) return
     try {
@@ -71,7 +76,7 @@ export default function ProfilePage({ store }: { store: Store }) {
 
   return (
     <>
-      <PageHeader title="You" />
+      <PageHeader title="You" noBack />
       <main className="page profile">
         <section className="step me">
           <label className="me-photo">
@@ -88,6 +93,7 @@ export default function ProfilePage({ store }: { store: Store }) {
             <RoleBadge role={store.myRole} />
             {profile.photo && <button type="button" className="link-btn" onClick={() => update({ photo: '' })}>Remove picture</button>}
           </div>
+          {store.nameRefused && <p className="error" role="alert">That name is kept for the {APP_NAME} team, so others can’t pretend to be them. Pick a different name.</p>}
           {photoProblem && <p className="error" role="alert">{photoProblem}</p>}
           {saveFailed && <p className="error" role="alert">This device is out of storage space, so your changes may not be kept. Try a smaller picture.</p>}
         </section>
@@ -174,10 +180,51 @@ export default function ProfilePage({ store }: { store: Store }) {
           Other people can see your name, picture, listings and “say hi about” picks. Your sizes, style,
           favourite brands and what the shop has learned stay private on this device.
         </p>
-        <p className="fineprint fineprint-link">
-          {store.myRole ? <a href="#/team">Team tools</a> : <>Part of the {APP_NAME} team? <a href="#/team">Team sign-in</a></>}
-        </p>
+        <MoveAccount />
+
+        <a className="btn btn-soft" href="#/team">{store.myRole ? 'Team tools' : `${APP_NAME} team sign-in`}</a>
       </main>
     </>
+  )
+}
+
+/** Moves this account (listings, chats, team access) to Safari, the home-screen app or a new phone. */
+function MoveAccount() {
+  const [shown, setShown] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [code, setCode] = useState('')
+  const [problem, setProblem] = useState('')
+  return (
+    <details className="safety move">
+      <summary>Use {APP_NAME} on another phone or browser</summary>
+      <p>
+        Your listings and chats belong to this phone’s browser. To keep them when you switch between Safari and the
+        home-screen app, or move to a new phone, copy your move code here and paste it there.
+      </p>
+      <p className="hint">Keep this code private, like a password. Anyone with it can act as you.</p>
+      {shown ? (
+        <div className="move-code">
+          <code>{moveCode()}</code>
+          <button type="button" className="btn btn-soft" onClick={async () => {
+            try { await navigator.clipboard.writeText(moveCode()); setCopied(true) } catch { setCopied(false) }
+          }}>{copied ? 'Copied' : 'Copy my move code'}</button>
+        </div>
+      ) : (
+        <button type="button" className="btn btn-soft" onClick={() => setShown(true)}>Show my move code</button>
+      )}
+      <form className="report" onSubmit={(e) => {
+        e.preventDefault()
+        if (!window.confirm('Switch this browser to the account from that code? Anything listed from this browser stays with its old account.')) return
+        if (applyMoveCode(code)) window.location.reload()
+        else setProblem('That code isn’t right. It is 64 letters and numbers, copied from your other browser.')
+      }}>
+        <label className="field">
+          <span>Paste a move code from your other browser</span>
+          <input value={code} onChange={(e) => { setCode(e.target.value); setProblem('') }} autoComplete="off" autoCapitalize="none" spellCheck={false} maxLength={80} />
+        </label>
+        {problem && <p className="error" role="alert">{problem}</p>}
+        <button type="submit" className="btn btn-soft" disabled={!code.trim()}>Move my account here</button>
+      </form>
+    </details>
   )
 }

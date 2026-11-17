@@ -72,7 +72,7 @@ export default function Events() {
 
   return (
     <>
-      <PageHeader title="Events near you" />
+      <PageHeader title="Events near you" noBack />
       <main className="page">
         <section className="where" aria-labelledby="where-h">
           <h2 id="where-h" className="row-h">

@@ -37,7 +37,8 @@ export default function Shop({ store, alerts, initialBrand = '' }: { store: Stor
 
   // Featured brands come first and show even with nothing listed.
   const brandRow = useMemo(
-    () => [...FEATURED.map((f) => f.brand), ...listedBrands.filter((b) => !featuredFor(b))],
+    // Example spots stay on the "Feature your brand" page; only real partners join the brand row.
+    () => [...FEATURED.filter((f) => !f.example).map((f) => f.brand), ...listedBrands.filter((b) => !featuredFor(b))],
     [listedBrands],
   )
   const featured = brand ? featuredFor(brand) : undefined
@@ -208,12 +209,10 @@ export default function Shop({ store, alerts, initialBrand = '' }: { store: Stor
         )}
 
         <p className="fineprint">
-          This is a preview of {APP_NAME}. Listings marked “Sample” are made-up examples, not real items,
-          and {APP_NAME} is not affiliated with the brands listed.
+          Outfits are listed by real people. Any marked “Sample” are made-up examples that fill the shop
+          until there’s more real stock. {APP_NAME} is not affiliated with the brands listed.
         </p>
-        <p className="fineprint fineprint-link">
-          Run a rave brand? <a href="#/for-brands">Feature your brand on {APP_NAME}</a>
-        </p>
+        <a className="btn btn-soft btn-wide" href="#/for-brands">Run a rave brand? Feature it on {APP_NAME}</a>
       </main>
     </>
   )

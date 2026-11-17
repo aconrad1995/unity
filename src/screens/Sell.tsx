@@ -1,22 +1,48 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { CameraIcon, CheckIcon, CloseIcon, PlusIcon } from '../art'
-import { APP_NAME, ART_FOR_CATEGORY, BRANDS, cleanBrand, CATEGORIES, CONDITIONS, SIZES, type Category, type ConditionId, type Listing, type Size } from '../data'
+import { APP_NAME, BRANDS, cleanBrand, CATEGORIES, CONDITIONS, SIZES, type Category, type ConditionId, type Listing, type Size } from '../data'
 import { shrinkPhoto, type Store } from '../store'
 import { PageHeader } from './PageHeader'
 
 const MAX_PHOTOS = 5
+// A half-finished outfit is kept while you look around the app, so tapping away never loses it.
+const DRAFT_KEY = 'unity.sellDraft.v1'
+type Draft = { photos: string[]; title: string; brand: string; category: Category | ''; size: Size | ''; condition: ConditionId | ''; price: string; description: string }
+const BLANK: Draft = { photos: [], title: '', brand: '', category: '', size: '', condition: '', price: '', description: '' }
+function readDraft(): Draft {
+  try {
+    return { ...BLANK, ...JSON.parse(sessionStorage.getItem(DRAFT_KEY) ?? '{}') }
+  } catch {
+    return BLANK
+  }
+}
+/** Keeps digits and one decimal point, so "45.50" stays 45.50 instead of turning into 4550. */
+const cleanPrice = (v: string) => v.replace(/[^\d.]/g, '').replace(/^(\d*\.?\d{0,2}).*$/, '$1').slice(0, 7)
 
 export default function Sell({ store }: { store: Store }) {
-  const [photos, setPhotos] = useState<string[]>([])
-  const [title, setTitle] = useState('')
-  const [brand, setBrand] = useState('')
-  const [category, setCategory] = useState<Category | ''>('')
-  const [size, setSize] = useState<Size | ''>('')
-  const [condition, setCondition] = useState<ConditionId | ''>('')
-  const [price, setPrice] = useState('')
-  const [description, setDescription] = useState('')
+  const [draft] = useState(readDraft)
+  const [photos, setPhotos] = useState<string[]>(draft.photos)
+  const [title, setTitle] = useState(draft.title)
+  const [brand, setBrand] = useState(draft.brand)
+  const [category, setCategory] = useState<Category | ''>(draft.category)
+  const [size, setSize] = useState<Size | ''>(draft.size)
+  const [condition, setCondition] = useState<ConditionId | ''>(draft.condition)
+  const [price, setPrice] = useState(draft.price)
+  const [description, setDescription] = useState(draft.description)
   const [sending, setSending] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  /** Clears a field's error as soon as it is fixed. */
+  const fixed = (key: string) => setErrors((e) => (e[key] || e.form ? { ...e, [key]: '', form: '' } : e))
+
+  useEffect(() => {
+    const d: Draft = { photos, title, brand, category, size, condition, price, description }
+    try {
+      if (JSON.stringify(d) === JSON.stringify(BLANK)) sessionStorage.removeItem(DRAFT_KEY)
+      else sessionStorage.setItem(DRAFT_KEY, JSON.stringify(d))
+    } catch {
+      try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, photos: [] })) } catch { /* the draft is a nicety */ }
+    }
+  }, [photos, title, brand, category, size, condition, price, description])
 
   async function onPhotos(files: FileList | null) {
     if (!files || files.length === 0) return
@@ -31,6 +57,7 @@ export default function Sell({ store }: { store: Store }) {
       }
     }
     setPhotos((cur) => [...cur, ...added].slice(0, MAX_PHOTOS))
+    if (added.length > 0) fixed('photo')
     const skipped = files.length - room
     setErrors((e) => ({
       ...e,
@@ -44,12 +71,14 @@ export default function Sell({ store }: { store: Store }) {
     e.preventDefault()
     const amount = Number(price)
     const next: Record<string, string> = {}
+    if (photos.length === 0) next.photo = 'Add at least one photo of your outfit.'
     if (!title.trim()) next.title = 'Give your outfit a short name.'
     if (!cleanBrand(brand)) next.brand = 'Type or pick the brand.'
     if (!category) next.category = 'Pick what kind of item it is.'
     if (!size) next.size = 'Pick the size.'
     if (!condition) next.condition = 'Choose how worn it is.'
     if (!price || !Number.isFinite(amount) || amount < 1) next.price = 'Enter a price of $1 or more.'
+    else if (amount > 10000) next.price = 'The most an outfit can be listed for is $10,000.'
     setErrors(next)
     if (Object.keys(next).length > 0 || !category || !size || !condition) {
       setTimeout(() => document.querySelector('[data-error="true"]')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 50)
@@ -68,15 +97,15 @@ export default function Sell({ store }: { store: Store }) {
       seller: 'You',
       sample: false,
       createdAt: Date.now(),
-      art: photos.length > 0 ? undefined : { kind: ART_FOR_CATEGORY[category], bg: '#FFE1EF', fill: '#6BC1FF', accent: '#FFFFFF' },
     }
     setSending(true)
-    const newId = await store.addListing(listing, photos)
+    const { id: newId, why } = await store.addListing(listing, photos)
     setSending(false)
     if (!newId) {
-      setErrors({ form: `Your outfit could not be saved because ${APP_NAME} could not be reached. Check your connection and try again.` })
+      setErrors({ form: why })
       return
     }
+    try { sessionStorage.removeItem(DRAFT_KEY) } catch { /* nothing to clear */ }
     try { sessionStorage.setItem('unity.justListed', newId) } catch { /* banner is optional */ }
     window.location.hash = `#/item/${newId}`
   }
@@ -85,7 +114,7 @@ export default function Sell({ store }: { store: Store }) {
 
   return (
     <>
-      <PageHeader title="Sell an outfit" />
+      <PageHeader title="Sell an outfit" noBack />
       <main className="page">
         <form className="sell" onSubmit={submit} noValidate>
           <fieldset className="step">
@@ -128,7 +157,7 @@ export default function Sell({ store }: { store: Store }) {
             <legend><span className="step-n">2</span> Tell us what it is</legend>
             <label className="field">
               <span>Name</span>
-              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Pink sparkle two-piece set" maxLength={60} />
+              <input value={title} onChange={(e) => { setTitle(e.target.value); fixed('title') }} placeholder="Pink sparkle two-piece set" maxLength={60} />
             </label>
             {err('title')}
             <label className="field">
@@ -136,7 +165,7 @@ export default function Sell({ store }: { store: Store }) {
               <input
                 list="brand-list"
                 value={brand}
-                onChange={(e) => setBrand(e.target.value)}
+                onChange={(e) => { setBrand(e.target.value); fixed('brand') }}
                 onBlur={() => setBrand(cleanBrand(brand))}
                 placeholder="Start typing, like Badinka"
                 maxLength={40}
@@ -152,7 +181,7 @@ export default function Sell({ store }: { store: Store }) {
               <span id="kind-l">Kind of item</span>
               <div className="bubbles bubbles-wrap">
                 {CATEGORIES.map((c) => (
-                  <button key={c} type="button" className="bubble bubble-blue" aria-pressed={category === c} onClick={() => setCategory(c)}>{c}</button>
+                  <button key={c} type="button" className="bubble bubble-blue" aria-pressed={category === c} onClick={() => { setCategory(c); fixed('category') }}>{c}</button>
                 ))}
               </div>
             </div>
@@ -161,7 +190,7 @@ export default function Sell({ store }: { store: Store }) {
               <span id="size-l">Size</span>
               <div className="bubbles bubbles-wrap">
                 {SIZES.map((s) => (
-                  <button key={s} type="button" className="bubble" aria-pressed={size === s} onClick={() => setSize(s)}>{s}</button>
+                  <button key={s} type="button" className="bubble" aria-pressed={size === s} onClick={() => { setSize(s); fixed('size') }}>{s}</button>
                 ))}
               </div>
             </div>
@@ -173,7 +202,7 @@ export default function Sell({ store }: { store: Store }) {
             <div className="choices">
               {CONDITIONS.map((c) => (
                 <label key={c.id} className={`choice${condition === c.id ? ' is-on' : ''}`}>
-                  <input type="radio" name="condition" className="sr-only" checked={condition === c.id} onChange={() => setCondition(c.id)} />
+                  <input type="radio" name="condition" className="sr-only" checked={condition === c.id} onChange={() => { setCondition(c.id); fixed('condition') }} />
                   <span className="choice-check"><CheckIcon /></span>
                   <span>
                     <strong>{c.label}</strong>
@@ -195,15 +224,16 @@ export default function Sell({ store }: { store: Store }) {
               <span>Price in dollars</span>
               <span className="price-input">
                 <span aria-hidden="true">$</span>
-                <input inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d]/g, ''))} placeholder="30" maxLength={4} />
+                <input inputMode="decimal" value={price} onChange={(e) => { setPrice(cleanPrice(e.target.value)); fixed('price') }} placeholder="30" maxLength={7} />
               </span>
             </label>
+            <span className="hint">Whole dollars work best. Cents are rounded, so $45.50 lists as $46.</span>
             {err('price')}
           </fieldset>
 
           {err('form')}
           <button type="submit" className="btn btn-wide btn-big" disabled={sending}>{sending ? 'Listing your outfit' : 'List my outfit'}</button>
-          <p className="fineprint">This is a preview. Your listing is saved on this device only and no one else can see it yet.</p>
+          <p className="fineprint">Your outfit shows in the shop for everyone using {APP_NAME}. You can edit it, or mark it sold, from its page.</p>
         </form>
       </main>
     </>

@@ -17,7 +17,9 @@ export default function App() {
   const store = useStore()
   const alerts = useAlerts(store)
   const [page, id, extra] = useRoute()
-  const tab = page === 'sell' ? 'sell' : page === 'chats' ? 'chats' : page === 'events' ? 'events' : page === 'you' ? 'you' : 'shop'
+  const tab = page === 'sell' ? 'sell' : page === 'chats' ? 'chats' : page === 'events' ? 'events' : page === 'you' || page === 'team' ? 'you' : 'shop'
+  // Inside a chat the bottom bar steps aside so it never covers the message box.
+  const inThread = page === 'chats' && !!id
 
   let screen
   if (page === 'item' && id) screen = <ListingPage store={store} id={id} />
@@ -37,7 +39,7 @@ export default function App() {
   return (
     <div className="app">
       {screen}
-      <nav className="tabbar" aria-label="Main">
+      {!inThread && <nav className="tabbar" aria-label="Main">
         <a href="#/" className="tab" aria-current={tab === 'shop' ? 'page' : undefined}>
           <ShopIcon />
           <span>Shop</span>
@@ -59,7 +61,7 @@ export default function App() {
           <ProfileIcon />
           <span>You</span>
         </a>
-      </nav>
+      </nav>}
     </div>
   )
 }

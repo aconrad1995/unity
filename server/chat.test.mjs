@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import { freshDir, start, listing } from './test-helpers.mjs'
 
 process.env.UNITY_DATA_DIR = freshDir()
+process.env.UNITY_NEW_KEYS_PER_IP = '25'
+process.env.UNITY_TRUST_CF = '1' // tests pretend to come from different addresses, as Cloudflare reports them
 process.env.UNITY_ADMIN_TOKEN = 'admin-token-for-tests'
 process.env.UNITY_OWNER_CODE = 'owner-code-for-tests'
 process.env.UNITY_ADMIN_CODE = 'admin-code-for-tests'
@@ -134,7 +136,7 @@ test('one address cannot mint endless new accounts', async () => {
     const r = await p.call('PUT', 'me', { name: `bot${i}` })
     if (r.status === 429) refused++
   }
-  assert.equal(refused, 5) // 25 new accounts per address per day
+  assert.equal(refused, 5) // 25 new accounts per address per day in this test (150 on the real site)
 })
 
 const jpeg = (n = 1) => 'data:image/jpeg;base64,' + Buffer.from([0xff, 0xd8, 0xff, 0xe0, n, 2, 3, 4, 5, 6]).toString('base64')

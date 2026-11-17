@@ -12,11 +12,12 @@
 //  - a message with the same id is stored once, so a retry never double-posts
 //  - the data file is written safely, backed up, and never silently reset
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto'
-import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { closeSync, copyFileSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 const DIR = resolve(process.env.UNITY_DATA_DIR || join(process.cwd(), '.data'))
 const FILE = join(DIR, 'unity.json')
+const PHOTOS = join(DIR, 'photos')
 const MAX_BODY = 4_000_000
 const EMPTY = { rev: 1, listings: [], people: {}, messages: [], blocks: {}, reports: [], roles: {}, looks: [], fit: null }
 
@@ -28,8 +29,16 @@ const ART_KINDS = ['set', 'top', 'bottom', 'bodysuit', 'bikini', 'accessory']
 
 const MAX_PER_CHAT = 2000
 const MAX_LISTINGS_PER_PERSON = 50
+const MAX_LOOKS_PER_PERSON = 30
 const MAX_PHOTOS = 5
 const MAX_LOOK_PHOTOS = 4
+const MAX_BLOCKS = 500
+// Photos live in their own files, not in unity.json. These caps keep one person (or a flood of
+// throwaway accounts) from filling the disk. The team gets the most room so the shop can be stocked.
+const MB = 1_000_000
+const PHOTO_BUDGET = Number(process.env.UNITY_PHOTO_BUDGET_MB || 850) * MB
+const PUBLIC_SHARE = 0.75 // everyone but the team stops at 75% of the budget
+const PERSON_BYTES = 40 * MB
 
 /* ---------- Saving: never lose or silently reset data ---------- */
 let db
@@ -59,29 +68,126 @@ function load() {
   return (db = upgrade(tryRead(FILE + '.bak') ?? structuredClone(EMPTY)))
 }
 
-/** Older saves kept one inline photo; photos are now a list served from their own addresses. */
+/* ---------- Photo files ---------- */
+const sizes = new Map() // photo file name -> bytes
+let photoBytes = 0
+
+function countPhotos() {
+  sizes.clear()
+  photoBytes = 0
+  if (!existsSync(PHOTOS)) return
+  for (const f of readdirSync(PHOTOS)) {
+    try {
+      const n = statSync(join(PHOTOS, f)).size
+      sizes.set(f, n)
+      photoBytes += n
+    } catch {
+      /* gone */
+    }
+  }
+}
+
+function writeDurably(file, data) {
+  const fd = openSync(file, 'w')
+  try {
+    writeSync(fd, data)
+    fsyncSync(fd)
+  } finally {
+    closeSync(fd)
+  }
+}
+
+/** Saves a data: URL as a file and returns its name. */
+function storePhoto(dataUrl, name = `${randomUUID()}.jpg`) {
+  mkdirSync(PHOTOS, { recursive: true })
+  const bytes = Buffer.from(dataUrl.slice(dataUrl.indexOf(',') + 1), 'base64')
+  writeDurably(join(PHOTOS, name), bytes)
+  photoBytes += bytes.length - (sizes.get(name) ?? 0)
+  sizes.set(name, bytes.length)
+  return name
+}
+
+function dropPhoto(name) {
+  if (typeof name !== 'string' || !sizes.has(name)) return
+  try {
+    unlinkSync(join(PHOTOS, name))
+  } catch {
+    /* already gone */
+  }
+  photoBytes -= sizes.get(name)
+  sizes.delete(name)
+}
+
+const bytesOf = (dataUrls) => dataUrls.reduce((n, p) => n + Math.floor(((p.length - p.indexOf(',') - 1) * 3) / 4), 0)
+function bytesOwnedBy(id) {
+  let n = 0
+  for (const x of [...db.listings, ...db.looks]) if (x.ownerId === id) for (const f of x.photos ?? []) n += sizes.get(f) ?? 0
+  return n
+}
+/** Refuses new photos when the disk budget, or this person's share of it, is used up. */
+function roomFor(id, dataUrls) {
+  const add = bytesOf(dataUrls)
+  if (add === 0) return
+  const staff = isStaff(id)
+  if (photoBytes + add > PHOTO_BUDGET * (staff ? 1 : PUBLIC_SHARE)) throw new Refuse(507, 'storage_full')
+  if (!staff && bytesOwnedBy(id) + add > PERSON_BYTES) throw new Refuse(507, 'storage_full')
+}
+
+/** Older saves kept photos inside unity.json. They are moved out to files, once. */
 function upgrade(d) {
-  for (const l of d.listings) {
-    if (!l.photos) l.photos = l.photo ? [l.photo] : []
-    delete l.photo
+  countPhotos()
+  let moved = false
+  for (const x of [...d.listings, ...(d.looks ?? [])]) {
+    if (!x.photos) x.photos = x.photo ? [x.photo] : []
+    delete x.photo
+    x.photos = x.photos.map((p) => {
+      if (typeof p === 'string' && p.startsWith('data:')) {
+        moved = true
+        return storePhoto(p)
+      }
+      return p
+    })
+  }
+  for (const [id, p] of Object.entries(d.people ?? {})) {
+    if (typeof p.photo === 'string' && p.photo.startsWith('data:')) {
+      moved = true
+      const ext = p.photo.slice(11, p.photo.indexOf(';'))
+      storePhoto(p.photo, `avatar-${id}.${ext}`)
+      p.photoType = ext
+      p.photo = `/api/avatar/${id}/${sumOf(p.photo)}`
+    }
+  }
+  d.roleCodes ??= {}
+  d.authFails ??= []
+  if (moved) {
+    db = d
+    save()
   }
   return d
 }
 
+/** Writes everything to disk. If that fails, the change is undone so memory and disk agree. */
 function save() {
   db.rev += 1
-  mkdirSync(DIR, { recursive: true })
-  const now = Date.now()
-  if (existsSync(FILE) && now - lastBackup > 60_000) {
-    try {
-      copyFileSync(FILE, FILE + '.bak')
-      lastBackup = now
-    } catch {
-      /* the backup is best effort */
+  try {
+    mkdirSync(DIR, { recursive: true })
+    const now = Date.now()
+    if (existsSync(FILE) && now - lastBackup > 60_000) {
+      try {
+        copyFileSync(FILE, FILE + '.bak')
+        lastBackup = now
+      } catch {
+        /* the backup is best effort */
+      }
     }
+    writeDurably(FILE + '.tmp', JSON.stringify(db))
+    renameSync(FILE + '.tmp', FILE)
+  } catch (e) {
+    console.error('could not save unity.json', e)
+    db = undefined
+    load()
+    throw new Refuse(503, 'not_saved')
   }
-  writeFileSync(FILE + '.tmp', JSON.stringify(db))
-  renameSync(FILE + '.tmp', FILE)
 }
 
 /* ---------- Rate limits ---------- */
@@ -107,19 +213,23 @@ const MINUTE = 60_000
 const HOUR = 3_600_000
 const DAY = 86_400_000
 
+// On Render every request comes through Cloudflare, which sets cf-connecting-ip itself and
+// overwrites anything a visitor sends. Anywhere else that header is just text from the visitor,
+// so it is ignored.
+const BEHIND_CLOUDFLARE = process.env.UNITY_TRUST_CF === '1' || (process.env.RENDER === 'true' && process.env.UNITY_TRUST_CF !== '0')
 function ipOf(req) {
   const cf = req.headers['cf-connecting-ip']
-  if (typeof cf === 'string' && cf) return cf
-  const fwd = req.headers['x-forwarded-for']
-  if (typeof fwd === 'string' && fwd) return fwd.split(',').pop().trim()
+  if (BEHIND_CLOUDFLARE && typeof cf === 'string' && cf) return cf
   return req.socket.remoteAddress ?? 'unknown'
 }
 
 // Many fresh keys from one address in a day is how someone dodges per-person limits.
+const NEW_KEYS_PER_IP = Number(process.env.UNITY_NEW_KEYS_PER_IP || 150)
 const keysByIp = new Map()
 function newIdentityAllowed(ip, me) {
   const set = keysByIp.get(ip) ?? new Set()
-  if (!set.has(me) && set.size >= 25) return false
+  // Generous, because festival wifi and phone networks put many real people behind one address.
+  if (!set.has(me) && set.size >= NEW_KEYS_PER_IP) return false
   set.add(me)
   keysByIp.set(ip, set)
   return true
@@ -137,15 +247,30 @@ const colour = (v, fallback) => (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.te
 const jpegOk = (v, max) =>
   typeof v === 'string' && v.length <= max && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(v) &&
   Buffer.from(v.slice(23, 31), 'base64').subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]))
+// A small, stable fingerprint of a picture, worked out the same way by the app (store.ts).
+function sumOf(s) {
+  let h = 0x811c9dc5
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193)
+  return (h >>> 0).toString(36)
+}
 const photoOk = (v, max) => typeof v === 'string' && v.length <= max && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(v)
 
 /* ---------- Team roles ----------
    The shop owner and administrators prove who they are once per device by typing a team code.
    The codes are set on the host (UNITY_OWNER_CODE, UNITY_ADMIN_CODE) and never stored in the code. */
-const roleOf = (id) => db.roles[id] ?? ''
+const CODE_ENV = { owner: 'UNITY_OWNER_CODE', admin: 'UNITY_ADMIN_CODE' }
+const MIN_CODE = 12
+const codeTag = (code) => createHash('sha256').update(`unity-role:${code}`).digest('hex').slice(0, 16)
+// A role only counts while the code it was claimed with is still the one set on the host.
+// Changing a code in Render signs every device that used the old one out of the team.
+function roleOf(id) {
+  const role = db.roles[id]
+  const want = role && process.env[CODE_ENV[role]]
+  return want && want.length >= MIN_CODE && db.roleCodes[id] === codeTag(want) ? role : ''
+}
 const isStaff = (id) => roleOf(id) !== ''
 function codeIs(given, want) {
-  if (typeof want !== 'string' || want.length < 8 || typeof given !== 'string') return false
+  if (typeof want !== 'string' || want.length < MIN_CODE || typeof given !== 'string') return false
   const a = Buffer.from(given.trim())
   const b = Buffer.from(want)
   return a.length === b.length && timingSafeEqual(a, b)
@@ -186,6 +311,21 @@ function readBody(req) {
   })
 }
 
+function sendPhoto(res, file, type) {
+  let data
+  try {
+    if (typeof file === 'string' && sizes.has(file)) data = readFileSync(join(PHOTOS, file))
+  } catch {
+    /* missing */
+  }
+  if (!data) throw new Refuse(404, 'not_found')
+  res.statusCode = 200
+  res.setHeader('Content-Type', type)
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  return res.end(data)
+}
+
 function send(res, status, body) {
   res.statusCode = status
   res.setHeader('Content-Type', 'application/json')
@@ -199,14 +339,14 @@ function snapshot(me) {
     me,
     // Photos are not sent in the sync; each one is fetched (and cached) from its own address.
     listings: db.listings.map(({ photos, ...l }) => ({ ...l, photoCount: photos?.length ?? 0 })),
-    people: db.people,
+    people: Object.fromEntries(Object.entries(db.people).map(([id, { photoType, ...p }]) => [id, p])),
     // Only messages this person sent, or received from someone they have not blocked.
     // Messages that were silently dropped (the sender is blocked) never reach the recipient.
     messages: db.messages
       .filter((m) => (m.from === me ? true : m.to === me && !m.dropped && !hasBlocked(me, m.from)))
       .map(({ dropped, ...m }) => m),
     blocked: db.blocks[me] ?? [],
-    roles: db.roles,
+    roles: Object.fromEntries(Object.keys(db.roles).map((id) => [id, roleOf(id)]).filter(([, r]) => r)),
     myRole: roleOf(me),
     looks: db.looks.map(({ photos, ...l }) => ({ ...l, photoCount: photos.length })),
     fit: db.fit,
@@ -238,6 +378,15 @@ function checkListing(b) {
   return { title, brand, category: b.category, size: b.size, condition: b.condition, price, description: text(b.description, 600), art, photos: given }
 }
 
+// Names that would let someone pass themselves off as the shop or the team.
+const squash = (s) => s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]/g, '')
+function nameReserved(name, me) {
+  const n = squash(name)
+  if (!n) return false
+  if (/unity|shopowner|owner|admin|official|moderator|staff/.test(n)) return true
+  return Object.keys(db.roles).some((id) => id !== me && roleOf(id) && squash(db.people[id]?.name ?? '') === n)
+}
+
 /* ---------- Routes ---------- */
 export async function api(req, res, next) {
   const url = new URL(req.url ?? '/', 'http://x')
@@ -258,13 +407,13 @@ export async function api(req, res, next) {
     // Listing photos load as ordinary pictures, so they cannot carry the secret key. They are public like the listing.
     if (req.method === 'GET' && path.startsWith('photo/')) {
       const [, id, n] = path.split('/')
-      const data = (db.listings.find((l) => l.id === id) ?? db.looks.find((l) => l.id === id))?.photos?.[Number(n)]
-      if (!data) throw new Refuse(404, 'not_found')
-      res.statusCode = 200
-      res.setHeader('Content-Type', 'image/jpeg')
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
-      res.setHeader('X-Content-Type-Options', 'nosniff')
-      return res.end(Buffer.from(data.slice(23), 'base64'))
+      const file = (db.listings.find((l) => l.id === id) ?? db.looks.find((l) => l.id === id))?.photos?.[Number(n)]
+      return sendPhoto(res, file, 'image/jpeg')
+    }
+    if (req.method === 'GET' && path.startsWith('avatar/')) {
+      const [, id] = path.split('/')
+      const type = isId(id) ? db.people[id]?.photoType : undefined
+      return sendPhoto(res, type && `avatar-${id}.${type}`, `image/${type}`)
     }
 
     const key = req.headers['x-unity-key']
@@ -286,12 +435,23 @@ export async function api(req, res, next) {
     if (req.method === 'PUT' && path === 'me') {
       if (!allow(`me:${me}`, 30, MINUTE)) throw new Refuse(429, 'rate_limited')
       const b = await readBody(req)
-      db.people[me] = {
-        name: text(b.name, 30),
-        photo: photoOk(b.photo, 400_000) ? b.photo : '',
-        upFor: Array.isArray(b.upFor) ? b.upFor.map((x) => text(x, 40)).filter(Boolean).slice(0, 8) : [],
+      const name = text(b.name, 30)
+      if (!isStaff(me) && nameReserved(name, me)) throw new Refuse(400, 'name_reserved')
+      const was = db.people[me]
+      const next = { name, photo: '', upFor: Array.isArray(b.upFor) ? b.upFor.map((x) => text(x, 40)).filter(Boolean).slice(0, 8) : [] }
+      if (photoOk(b.photo, 400_000)) {
+        next.photo = `/api/avatar/${me}/${sumOf(b.photo)}`
+        next.photoType = b.photo.slice(11, b.photo.indexOf(';'))
+        if (was?.photo !== next.photo) {
+          if (was?.photoType) dropPhoto(`avatar-${me}.${was.photoType}`)
+          roomFor(me, [b.photo])
+          storePhoto(b.photo, `avatar-${me}.${next.photoType}`)
+        }
+      } else if (was?.photoType) dropPhoto(`avatar-${me}.${was.photoType}`)
+      if (JSON.stringify(was) !== JSON.stringify(next)) {
+        db.people[me] = next
+        save()
       }
-      save()
       return send(res, 200, snapshot(me))
     }
 
@@ -301,15 +461,51 @@ export async function api(req, res, next) {
       const b = await readBody(req)
       const fields = checkListing(b)
       if (db.listings.filter((l) => l.ownerId === me).length >= (isStaff(me) ? 5000 : MAX_LISTINGS_PER_PERSON)) throw new Refuse(400, 'too_many_listings')
-      db.listings.unshift({ id: randomUUID(), ownerId: me, ...fields, seller: '', sample: false, createdAt: Date.now() })
-      save()
+      roomFor(me, fields.photos)
+      const photos = fields.photos.map((p) => storePhoto(p))
+      db.listings.unshift({ id: randomUUID(), ownerId: me, ...fields, photos, seller: '', sample: false, createdAt: Date.now() })
+      try {
+        save()
+      } catch (e) {
+        photos.forEach(dropPhoto)
+        throw e
+      }
       return send(res, 200, { ...snapshot(me), id: db.listings[0].id })
     }
 
     if (req.method === 'DELETE' && path.startsWith('listings/')) {
       const id = path.slice(9)
-      db.listings = db.listings.filter((l) => !(l.id === id && (l.ownerId === me || isStaff(me))))
-      save()
+      const gone = db.listings.find((l) => l.id === id && (l.ownerId === me || isStaff(me)))
+      if (gone) {
+        db.listings = db.listings.filter((l) => l !== gone)
+        save()
+        gone.photos.forEach(dropPhoto)
+      }
+      return send(res, 200, snapshot(me))
+    }
+
+    // Change a listing's details, or mark it sold / reserved.
+    if (req.method === 'PATCH' && path.startsWith('listings/')) {
+      if (!allow(`edit:${me}`, 120, HOUR)) throw new Refuse(429, 'rate_limited')
+      const l = db.listings.find((x) => x.id === path.slice(9) && (x.ownerId === me || isStaff(me)))
+      if (!l) throw new Refuse(404, 'not_found')
+      const b = await readBody(req)
+      const next = { ...l }
+      if ('title' in b) next.title = text(b.title, 80)
+      if ('description' in b) next.description = text(b.description, 600)
+      if ('price' in b) next.price = Math.round(Number(b.price))
+      if ('size' in b) next.size = b.size
+      if ('condition' in b) next.condition = b.condition
+      if ('status' in b) next.status = ['sold', 'reserved'].includes(b.status) ? b.status : undefined
+      if (!next.title || !(next.price >= 1 && next.price <= 10000) || !SIZES.includes(next.size) || !CONDITIONS.includes(next.condition)) throw new Refuse(400, 'bad_details')
+      if (next.status === 'sold' && l.status !== 'sold') next.soldAt = Date.now()
+      if (next.status !== 'sold') delete next.soldAt
+      if (!next.status) delete next.status
+      if (JSON.stringify(next) !== JSON.stringify(l)) {
+        Object.keys(l).forEach((k) => delete l[k])
+        Object.assign(l, next)
+        save()
+      }
       return send(res, 200, snapshot(me))
     }
 
@@ -330,8 +526,12 @@ export async function api(req, res, next) {
       if (!allow(`msg:${me}`, 20, MINUTE) || !allow(`msgday:${me}`, 300, DAY)) throw new Refuse(429, 'rate_limited')
       if (started && !allow(`chatnew:${me}`, 15, DAY)) throw new Refuse(429, 'rate_limited')
 
-      const listingId = isMsgId(b.listingId) && db.listings.some((l) => l.id === b.listingId) ? b.listingId : undefined
-      db.messages.push({ id, from: me, to, text: body, listingId, at: Date.now(), ...(hasBlocked(to, me) ? { dropped: true } : {}) })
+      const about = isMsgId(b.listingId) ? db.listings.find((l) => l.id === b.listingId) : undefined
+      // The outfit's name is kept with the message, so the chat still makes sense after it is sold or removed.
+      db.messages.push({
+        id, from: me, to, text: body, listingId: about?.id, about: about?.title, at: Date.now(),
+        ...(hasBlocked(to, me) ? { dropped: true } : {}),
+      })
 
       // Keep each chat to a sane size by letting the oldest messages go.
       const inChat = db.messages.filter((m) => (m.from === me && m.to === to) || (m.from === to && m.to === me))
@@ -347,10 +547,17 @@ export async function api(req, res, next) {
       if (!allow(`block:${me}`, 30, MINUTE)) throw new Refuse(429, 'rate_limited')
       const b = await readBody(req)
       if (!isId(b.user) || b.user === me) throw new Refuse(400, 'bad_user')
-      const list = (db.blocks[me] ?? []).filter((x) => x !== b.user)
-      if (b.on) list.push(b.user)
-      db.blocks[me] = list
-      save()
+      const was = db.blocks[me] ?? []
+      const list = was.filter((x) => x !== b.user)
+      if (b.on) {
+        if (!knownPerson(b.user)) throw new Refuse(404, 'unknown_person')
+        if (list.length >= MAX_BLOCKS) throw new Refuse(400, 'too_many_blocks')
+        list.push(b.user)
+      }
+      if (list.join() !== was.join()) {
+        db.blocks[me] = list
+        save()
+      }
       return send(res, 200, snapshot(me))
     }
 
@@ -374,9 +581,16 @@ export async function api(req, res, next) {
       if (!allow(`look:${me}`, isStaff(me) ? 200 : 10, DAY)) throw new Refuse(429, 'rate_limited')
       const b = await readBody(req)
       const fields = checkLook(b)
-      if (db.looks.filter((l) => l.ownerId === me).length >= (isStaff(me) ? 5000 : 200)) throw new Refuse(400, 'too_many_looks')
-      db.looks.unshift({ id: randomUUID(), ownerId: me, ...fields, createdAt: Date.now() })
-      save()
+      if (db.looks.filter((l) => l.ownerId === me).length >= (isStaff(me) ? 5000 : MAX_LOOKS_PER_PERSON)) throw new Refuse(400, 'too_many_looks')
+      roomFor(me, fields.photos)
+      const photos = fields.photos.map((p) => storePhoto(p))
+      db.looks.unshift({ id: randomUUID(), ownerId: me, ...fields, photos, createdAt: Date.now() })
+      try {
+        save()
+      } catch (e) {
+        photos.forEach(dropPhoto)
+        throw e
+      }
       return send(res, 200, { ...snapshot(me), id: db.looks[0].id })
     }
 
@@ -387,17 +601,30 @@ export async function api(req, res, next) {
         db.looks = db.looks.filter((l) => l.id !== id)
         if (db.fit?.lookId === id) db.fit = null
         save()
+        look.photos.forEach(dropPhoto)
       }
       return send(res, 200, snapshot(me))
     }
 
     /* ---------- Team ---------- */
     if (req.method === 'POST' && path === 'team/claim') {
+      // Wrong guesses from everyone together are capped, so even a flood of new devices and
+      // addresses gets very few tries. The real team can always try again an hour later.
+      const now = Date.now()
+      db.authFails = db.authFails.filter((t) => now - t < HOUR)
+      if (db.authFails.length >= 20) throw new Refuse(429, 'rate_limited')
       if (!allow(`claim:${ipOf(req)}`, 8, HOUR) || !allow(`claimme:${me}`, 8, HOUR)) throw new Refuse(429, 'rate_limited')
       const b = await readBody(req)
       const role = codeIs(b.code, process.env.UNITY_OWNER_CODE) ? 'owner' : codeIs(b.code, process.env.UNITY_ADMIN_CODE) ? 'admin' : ''
-      if (!role) throw new Refuse(403, 'wrong_code')
+      if (!role) {
+        db.authFails.push(now)
+        save()
+        console.warn('team sign-in: wrong code')
+        throw new Refuse(403, 'wrong_code')
+      }
       db.roles[me] = role
+      db.roleCodes[me] = codeTag(process.env[CODE_ENV[role]])
+      console.warn(`team sign-in: ${me} is now ${role}`)
       save()
       return send(res, 200, snapshot(me))
     }

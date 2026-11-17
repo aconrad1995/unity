@@ -53,6 +53,9 @@ export interface Listing {
   /** How many pictures the seller added. Each loads from /api/photo/<id>/<number>. */
   photoCount?: number
   art?: { kind: ArtKind; bg: string; fill: string; accent: string }
+  /** Set by the seller. Sold outfits leave the shop after a day. */
+  status?: 'sold' | 'reserved'
+  soldAt?: number
 }
 
 export const conditionLabel = (id: ConditionId) => CONDITIONS.find((c) => c.id === id)!.label

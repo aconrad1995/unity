@@ -41,9 +41,9 @@ export function TeamPage({ store }: { store: Store }) {
             <h2 className="section-h section-h-in">You’re signed in as <RoleBadge role={store.myRole} /></h2>
             <p>This device has team tools. The badge shows next to your name on your listings, looks and chats, so people know it’s really you.</p>
             <ul className="team-tools">
+              <li><a className="btn" href="#/sell">List an outfit</a></li>
               <li><a className="btn btn-soft" href="#/team/reports">Review reports</a></li>
               <li><a className="btn btn-soft" href="#/inspo">Pick the fit of the week</a></li>
-              <li><a className="btn btn-soft" href="#/sell">List an outfit</a></li>
               <li><a className="btn btn-soft" href="#/inspo/new">Post a look</a></li>
             </ul>
             <p className="hint">You can remove any listing or look that breaks the rules from its own page.</p>
@@ -100,7 +100,7 @@ export function ReportsPage({ store }: { store: Store }) {
             <p className="hint">{when(r.at)}</p>
             <p className="report-reason">“{r.reason}”</p>
             {r.evidence.length > 0 && (
-              <details>
+              <details className="safety">
                 <summary>Last {r.evidence.length} messages between them</summary>
                 <ol className="evidence">
                   {r.evidence.map((m) => (

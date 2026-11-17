@@ -28,6 +28,7 @@ function write(key: string, value: unknown): boolean {
    different people see the same shop and can message each other. This device proves who it
    is with a long random secret key that never leaves it except to that server. */
 const KEY_KEY = 'unity.key.v1'
+const SAMPLES_UNTIL = 8
 const READ_KEY = 'unity.read.v1'
 
 function deviceKey(): string {
@@ -46,7 +47,7 @@ function deviceKey(): string {
 }
 
 export interface Person { name: string; photo: string; upFor: string[] }
-export interface Message { id: string; from: string; to: string; text: string; listingId?: string; at: number; state?: 'sending' | 'failed' | 'rejected'; why?: string }
+export interface Message { id: string; from: string; to: string; text: string; listingId?: string; about?: string; at: number; state?: 'sending' | 'failed' | 'rejected'; why?: string }
 export type Role = '' | 'owner' | 'admin'
 export interface Look { id: string; ownerId: string; caption: string; brands: string[]; photoCount: number; createdAt: number }
 export interface Fit { lookId: string; note: string; at: number; by: string }
@@ -78,8 +79,45 @@ async function call(method: string, path: string, body?: unknown): Promise<Reply
 }
 const fetchData = async (method: string, path: string, body?: unknown) => (await call(method, path, body)).data
 
-const samePerson = (a: Person | undefined, b: Person) =>
-  !!a && a.name === b.name && a.photo === b.photo && a.upFor.join('|') === b.upFor.join('|')
+// The same small fingerprint the server uses (server/api.mjs sumOf), so the app can tell whether
+// the picture on the server is already this one without downloading it.
+function sumOf(s: string) {
+  let h = 0x811c9dc5
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193)
+  return (h >>> 0).toString(36)
+}
+const samePerson = (a: Person | undefined, b: Person, me: string) =>
+  !!a && a.name === b.name && a.photo === (b.photo ? `/api/avatar/${me}/${sumOf(b.photo)}` : '') && a.upFor.join('|') === b.upFor.join('|')
+
+/* ---------- Moving to another phone or browser ----------
+   Everything someone has listed belongs to this device's secret key. Showing it as a "move code"
+   lets Mary carry her shop from Safari to the home-screen app, or to a new phone. */
+export function moveCode(): string {
+  return deviceKey()
+}
+export function applyMoveCode(code: string): boolean {
+  const clean = code.trim().toLowerCase()
+  if (!/^[0-9a-f]{64}$/.test(clean)) return false
+  try {
+    localStorage.setItem(KEY_KEY, clean)
+    localStorage.removeItem(OUTBOX_KEY)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** What a refusal from the server means, in words for the person using the app. */
+export const LISTING_WHY: Record<string, string> = {
+  rate_limited: 'You have listed a lot in a short time. Wait a little while, then try again.',
+  storage_full: 'Unity is out of room for new photos right now. Message the team and we’ll sort it out.',
+  too_many_listings: 'You have reached the most outfits one person can list. Remove a sold one to add more.',
+  bad_photo: 'One of the photos could not be used. Try taking it again, or choose a different photo.',
+  too_many_photos: 'That’s too many photos. Up to 5 per outfit.',
+  bad_price: 'The price needs to be between $1 and $10,000.',
+  not_saved: 'Your outfit could not be saved. Try again in a moment.',
+  too_big: 'Those photos are too big to send together. Try fewer photos.',
+}
 
 /* ---------- Outgoing messages ----------
    A message shows in the chat the moment it is sent. It is kept on this device until the server
@@ -108,6 +146,8 @@ export function useStore() {
   const latest = useRef(NOTHING)
   const outboxRef = useRef(outbox)
   const inflight = useRef(new Set<string>())
+  const refusedProfile = useRef('')
+  const [nameRefused, setNameRefused] = useState(false)
   outboxRef.current = outbox
 
   const take = useCallback((next: Shared | null) => {
@@ -162,8 +202,20 @@ export function useStore() {
         // Keep the public part of the profile (name, picture, "say hi about") up to date.
         const p = readProfile()
         const mine: Person = { name: p.name.trim(), photo: p.photo, upFor: p.upFor }
-        const known = latest.current.people[latest.current.me]
-        if (!samePerson(known, mine) && (known || mine.name || mine.photo || mine.upFor.length > 0)) take(await fetchData('PUT', 'me', mine))
+        const meId = latest.current.me
+        const known = latest.current.people[meId]
+        const sig = JSON.stringify(mine)
+        if (!samePerson(known, mine, meId) && sig !== refusedProfile.current && (known || mine.name || mine.photo || mine.upFor.length > 0)) {
+          const r = await call('PUT', 'me', mine)
+          if (r.data) {
+            take(r.data)
+            setNameRefused(false)
+          } else if (r.error === 'name_reserved') {
+            // Not tried again until the name changes.
+            refusedProfile.current = sig
+            setNameRefused(true)
+          }
+        }
       }
       busy = false
     }
@@ -179,13 +231,27 @@ export function useStore() {
     write(SAVED_KEY, saved)
   }, [saved])
 
-  const listings = useMemo(() => [...shared.listings, ...SAMPLE_LISTINGS], [shared.listings])
+  // Sample outfits fill the shop only until real ones arrive, so they never get mixed in with real stock.
+  // Sold outfits drop out of the shop after a day, but stay in the seller's closet.
+  const listings = useMemo(() => {
+    const dayAgo = Date.now() - 86_400_000
+    const real = shared.listings.filter((l) => l.status !== 'sold' || (l.soldAt ?? 0) > dayAgo || l.ownerId === shared.me)
+    return real.length >= SAMPLES_UNTIL ? real : [...real, ...SAMPLE_LISTINGS]
+  }, [shared.listings, shared.me])
   const mine = useMemo(() => shared.listings.filter((l) => l.ownerId === shared.me), [shared.listings, shared.me])
 
-  /** Returns the new listing's id, or '' when it could not be saved. */
-  const addListing = useCallback(async (listing: Listing, photos: string[] = []): Promise<string> => {
-    const got = await fetchData('POST', 'listings', { ...listing, photos })
-    return take(got) ? (got as { id?: string }).id ?? '' : ''
+  /** Returns the new listing's id, or why it could not be saved. */
+  const addListing = useCallback(async (listing: Listing, photos: string[] = []): Promise<{ id: string; why: string }> => {
+    const r = await call('POST', 'listings', { ...listing, photos })
+    if (take(r.data)) return { id: r.data!.id ?? '', why: '' }
+    return { id: '', why: (r.error && LISTING_WHY[r.error]) || (r.status === 0 ? `Unity can’t be reached. Check your connection and try again.` : 'Your outfit could not be listed. Try again in a moment.') }
+  }, [take])
+
+  /** Changes a listing's details or marks it sold / reserved. Returns why it failed, or '' when it worked. */
+  const editListing = useCallback(async (id: string, change: Partial<Pick<Listing, 'title' | 'price' | 'description' | 'size' | 'condition'>> & { status?: Listing['status'] | null }) => {
+    const r = await call('PATCH', `listings/${id}`, change)
+    if (take(r.data)) return ''
+    return r.error === 'bad_details' ? 'Check the name and price, then try again.' : r.status === 0 ? 'Unity can’t be reached. Check your connection.' : 'That change could not be saved. Try again in a moment.'
   }, [take])
 
   const removeListing = useCallback(async (id: string) => take(await fetchData('DELETE', `listings/${id}`)), [take])
@@ -258,7 +324,7 @@ export function useStore() {
   return {
     listings, mine, saved, online, me: shared.me, people: shared.people, blocked: shared.blocked, chats, unread,
     roles: shared.roles ?? {}, myRole: shared.myRole ?? '', looks: shared.looks ?? [], fit: shared.fit ?? null,
-    addListing, removeListing, toggleSaved, sendMessage, retryMessage, discardMessage, setBlocked, report, markRead,
+    nameRefused, addListing, editListing, removeListing, toggleSaved, sendMessage, retryMessage, discardMessage, setBlocked, report, markRead,
     addLook, removeLook, claimRole, pickFit, teamReports, resolveReport,
   }
 }
