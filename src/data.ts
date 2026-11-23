@@ -15,6 +15,10 @@ export const BRANDS: readonly string[] = [
 ]
 
 /** Tidies a typed brand: trims it and uses the known spelling when there is one. */
+/** Where a listing's photo loads from. Photos are cached for a year, so the address carries their version. */
+export const photoSrc = (l: Pick<Listing, 'id' | 'photoV'>, i: number): string =>
+  `/api/photo/${l.id}/${i}${l.photoV ? `?v=${l.photoV}` : ''}`
+
 /** A price as shoppers read it: $45, $1,200. */
 export const money = (dollars: number): string => '$' + dollars.toLocaleString('en-US')
 
@@ -53,8 +57,10 @@ export interface Listing {
   ownerId?: string
   sample: boolean
   createdAt: number
-  /** How many pictures the seller added. Each loads from /api/photo/<id>/<number>. */
+  /** How many pictures the seller added. Each loads from photoSrc(). */
   photoCount?: number
+  /** Changes whenever the seller changes the photos, so cached pictures are never stale. */
+  photoV?: string
   art?: { kind: ArtKind; bg: string; fill: string; accent: string }
   /** Set by the seller. Sold outfits leave the shop after a day. */
   status?: 'sold' | 'reserved'
