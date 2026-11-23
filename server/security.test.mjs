@@ -102,3 +102,15 @@ test('changing a team code on the host signs out everyone who used the old one',
   process.env.UNITY_OWNER_CODE = 'owner-code-for-tests'
 })
 
+
+test('a listing keeps the festival it was worn at, trimmed, and leaves it off when blank', async () => {
+  const worn = await mary.call('POST', 'listings', listing({ wornAt: `  Tahoe Live 2026 ${'x'.repeat(100)}` }))
+  assert.equal(worn.status, 200)
+  const got = worn.body.listings.find((l) => l.id === worn.body.id)
+  assert.equal(got.wornAt.length, 60)
+  assert.ok(got.wornAt.startsWith('Tahoe Live 2026'))
+  const plain = await mary.call('POST', 'listings', listing({ wornAt: '   ' }))
+  assert.equal('wornAt' in plain.body.listings.find((l) => l.id === plain.body.id), false)
+  await mary.call('DELETE', `listings/${worn.body.id}`)
+  await mary.call('DELETE', `listings/${plain.body.id}`)
+})

@@ -1,5 +1,5 @@
 import { bandColor, bandPrint, dateParts } from '../events'
-import { daysUntil, useGoing } from '../going'
+import { answerBackFrom, daysUntil, useGoing } from '../going'
 
 /** Your next festival as a band-stub ticket, counting down. Shows nothing until you mark one, unless `prompt` is set. */
 export function Countdown({ prompt = false }: { prompt?: boolean }) {
@@ -38,5 +38,32 @@ export function Countdown({ prompt = false }: { prompt?: boolean }) {
         <p>{ev.city}{more > 0 && <span className="countdown-more"> · {more} more on your list</span>}</p>
       </div>
     </a>
+  )
+}
+
+/** Shown once after a marked festival ends: list what you wore while the photos are fresh. */
+export function BackFrom() {
+  const { backFrom: ev } = useGoing()
+  if (!ev) return null
+  const d = dateParts(ev.date, ev.days)
+  return (
+    <section className="countdown back-from" data-print={bandPrint(ev.id)} style={{ ['--band' as string]: bandColor(ev.id) }} aria-labelledby="back-from-h">
+      <div className="event-date" aria-hidden="true">
+        <div>
+          <span>{d.month}</span>
+          <strong>{String(d.day).padStart(2, '0')}</strong>
+          {ev.days > 1 && <small>{ev.days} days</small>}
+        </div>
+      </div>
+      <div className="countdown-main">
+        <p className="event-kicker">How was it?</p>
+        <h2 id="back-from-h">{ev.name}</h2>
+        <p>Sell what you wore while it’s still fresh. We’ll tag it as worn there.</p>
+        <div className="event-actions">
+          <a className="btn" href={`#/sell/worn/${encodeURIComponent(ev.id)}`}>List my outfit</a>
+          <button type="button" className="btn btn-soft" onClick={() => answerBackFrom(ev.id)}>Not now</button>
+        </div>
+      </div>
+    </section>
   )
 }

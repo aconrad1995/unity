@@ -23,7 +23,7 @@ export default function App() {
 
   let screen
   if (page === 'item' && id) screen = <ListingPage store={store} id={id} />
-  else if (page === 'sell') screen = <Sell store={store} />
+  else if (page === 'sell') screen = <Sell store={store} wornFrom={id === 'worn' && extra ? decodeURIComponent(extra) : undefined} />
   else if (page === 'saved') screen = <Saved store={store} />
   else if (page === 'for-brands') screen = <ForBrands />
   else if (page === 'events') screen = <Events />

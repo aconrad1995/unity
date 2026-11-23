@@ -39,6 +39,7 @@ export function Card({ listing, store }: { listing: Listing; store: Store }) {
         <div className="card-body">
           <p className="card-brand">{listing.brand}</p>
           <h3 className="card-title">{listing.title}</h3>
+          {listing.wornAt && <p className="card-worn">Worn at {listing.wornAt}</p>}
           <p className="card-meta">
             <span className="size-pill">{listing.size}</span>
             <span className={`cond cond-${listing.condition}`}>{conditionLabel(listing.condition)}</span>

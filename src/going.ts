@@ -42,6 +42,34 @@ export function daysUntil(date: string) {
   return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000)
 }
 
+/** "Tahoe Live 2026": how a festival is named on a listing worn there. */
+export const wornLabel = (ev: Pick<GoingEvent, 'name' | 'date'>) => `${ev.name} ${ev.date.slice(0, 4)}`
+
+/* Festivals someone has been back from: after a marked event ends, Unity asks once whether
+   they want to list what they wore. Answered ones (listed or "not now") are remembered here. */
+const BACK_KEY = 'unity.backfrom.v1'
+const BACK_DAYS = 21
+function readBack(): string[] {
+  try {
+    const list = JSON.parse(localStorage.getItem(BACK_KEY) ?? '[]')
+    return Array.isArray(list) ? list.filter((x) => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+export function answerBackFrom(id: string) {
+  try {
+    localStorage.setItem(BACK_KEY, JSON.stringify([...new Set([...readBack(), id])].slice(-50)))
+  } catch {
+    /* asking again is harmless */
+  }
+  window.dispatchEvent(new Event(CHANGED))
+}
+
+/** Marked festivals that ended in the last three weeks, newest first. */
+export const pastGoing = (list: GoingEvent[]) =>
+  list.filter((x) => { const end = lastDay(x); return end < today() && -daysUntil(end) <= BACK_DAYS }).sort((a, b) => b.date.localeCompare(a.date))
+
 export function useGoing() {
   const [list, setList] = useState(read)
   useEffect(() => {
@@ -60,5 +88,7 @@ export function useGoing() {
       ? cur.filter((x) => x.id !== ev.id)
       : [...cur, { id: ev.id, name: ev.name, city: ev.city, date: ev.date, days: ev.days, url: ev.url }])
   }
-  return { list, next: upcoming(list), isGoing, toggle }
+  const answered = readBack()
+  const backFrom = pastGoing(list).find((x) => !answered.includes(x.id))
+  return { list, next: upcoming(list), past: pastGoing(list), backFrom, isGoing, toggle }
 }

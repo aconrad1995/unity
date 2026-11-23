@@ -1,14 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { CameraIcon, CheckIcon, CloseIcon, PlusIcon } from '../art'
 import { APP_NAME, BRANDS, cleanBrand, CATEGORIES, CONDITIONS, SIZES, type Category, type ConditionId, type Listing, type Size } from '../data'
+import { answerBackFrom, useGoing, wornLabel } from '../going'
+import { lastDay } from '../events'
 import { shrinkPhoto, type Store } from '../store'
 import { PageHeader } from './PageHeader'
 
 const MAX_PHOTOS = 5
 // A half-finished outfit is kept while you look around the app, so tapping away never loses it.
 const DRAFT_KEY = 'unity.sellDraft.v1'
-type Draft = { photos: string[]; title: string; brand: string; category: Category | ''; size: Size | ''; condition: ConditionId | ''; price: string; description: string }
-const BLANK: Draft = { photos: [], title: '', brand: '', category: '', size: '', condition: '', price: '', description: '' }
+type Draft = { photos: string[]; title: string; brand: string; category: Category | ''; size: Size | ''; condition: ConditionId | ''; price: string; description: string; wornAt: string }
+const BLANK: Draft = { photos: [], title: '', brand: '', category: '', size: '', condition: '', price: '', description: '', wornAt: '' }
 function readDraft(): Draft {
   try {
     return { ...BLANK, ...JSON.parse(sessionStorage.getItem(DRAFT_KEY) ?? '{}') }
@@ -19,8 +21,14 @@ function readDraft(): Draft {
 /** Keeps digits and one decimal point, so "45.50" stays 45.50 instead of turning into 4550. */
 const cleanPrice = (v: string) => v.replace(/[^\d.]/g, '').replace(/^(\d*\.?\d{0,2}).*$/, '$1').slice(0, 7)
 
-export default function Sell({ store }: { store: Store }) {
+export default function Sell({ store, wornFrom }: { store: Store; wornFrom?: string }) {
   const [draft] = useState(readDraft)
+  const going = useGoing()
+  // Opened from "Back from…": that festival is filled in.
+  const fromEvent = wornFrom ? going.list.find((x) => x.id === wornFrom) : undefined
+  const [wornAt, setWornAt] = useState(fromEvent ? wornLabel(fromEvent) : draft.wornAt)
+  const today = new Date().toISOString().slice(0, 10)
+  const wornChoices = going.list.filter((x) => x.date <= today || lastDay(x) < today).map(wornLabel)
   const [photos, setPhotos] = useState<string[]>(draft.photos)
   const [title, setTitle] = useState(draft.title)
   const [brand, setBrand] = useState(draft.brand)
@@ -35,14 +43,14 @@ export default function Sell({ store }: { store: Store }) {
   const fixed = (key: string) => setErrors((e) => (e[key] || e.form ? { ...e, [key]: '', form: '' } : e))
 
   useEffect(() => {
-    const d: Draft = { photos, title, brand, category, size, condition, price, description }
+    const d: Draft = { photos, title, brand, category, size, condition, price, description, wornAt }
     try {
       if (JSON.stringify(d) === JSON.stringify(BLANK)) sessionStorage.removeItem(DRAFT_KEY)
       else sessionStorage.setItem(DRAFT_KEY, JSON.stringify(d))
     } catch {
       try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, photos: [] })) } catch { /* the draft is a nicety */ }
     }
-  }, [photos, title, brand, category, size, condition, price, description])
+  }, [photos, title, brand, category, size, condition, price, description, wornAt])
 
   async function onPhotos(files: FileList | null) {
     if (!files || files.length === 0) return
@@ -94,6 +102,7 @@ export default function Sell({ store }: { store: Store }) {
       condition,
       price: Math.round(amount),
       description: description.trim() || 'No description added.',
+      ...(wornAt.trim() ? { wornAt: wornAt.trim().slice(0, 60) } : {}),
       seller: 'You',
       sample: false,
       createdAt: Date.now(),
@@ -105,6 +114,7 @@ export default function Sell({ store }: { store: Store }) {
       setErrors({ form: why })
       return
     }
+    if (wornFrom) answerBackFrom(wornFrom)
     try { sessionStorage.removeItem(DRAFT_KEY) } catch { /* nothing to clear */ }
     try { sessionStorage.setItem('unity.justListed', newId) } catch { /* banner is optional */ }
     window.location.hash = `#/item/${newId}`
@@ -116,6 +126,7 @@ export default function Sell({ store }: { store: Store }) {
     <>
       <PageHeader title="Sell an outfit" noBack />
       <main className="page">
+        {fromEvent && <p className="sell-from">Back from <strong>{fromEvent.name}</strong>. This outfit will be tagged as worn there.</p>}
         <form className="sell" onSubmit={submit} noValidate>
           <fieldset className="step">
             <legend><span className="step-n">1</span> Add your photos</legend>
@@ -215,6 +226,14 @@ export default function Sell({ store }: { store: Store }) {
             <label className="field">
               <span>Anything buyers should know? (optional)</span>
               <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} maxLength={400} placeholder="Fit, flaws, how it was washed" />
+            </label>
+            <label className="field">
+              <span>Worn at a festival? (optional)</span>
+              <input list="worn-list" value={wornAt} onChange={(e) => setWornAt(e.target.value)} placeholder="Like Tahoe Live 2026" maxLength={60} autoComplete="off" />
+              <datalist id="worn-list">
+                {wornChoices.map((w) => <option key={w} value={w} />)}
+              </datalist>
+              <span className="hint">Shoppers can search by festival, and it shows on your listing.</span>
             </label>
           </fieldset>
 
