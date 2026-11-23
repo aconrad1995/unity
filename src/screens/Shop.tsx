@@ -5,6 +5,7 @@ import { APP_NAME, CATEGORIES, FEATURED, SIZES, conditionLabel, featuredFor } fr
 import { bumpStat, readProfile, type Store } from '../store'
 import { hasSignals, note, noteSearch, readTaste, score } from '../taste'
 import { Card } from './Card'
+import { Countdown } from './Countdown'
 
 type Sort = 'you' | 'new' | 'low' | 'high'
 
@@ -104,6 +105,7 @@ export default function Shop({ store, alerts, initialBrand = '' }: { store: Stor
       </header>
 
       <main className="page">
+        <Countdown />
         <InspoStrip store={store} />
         <section aria-labelledby="brands-h">
           <h2 id="brands-h" className="row-h">Shop by brand</h2>

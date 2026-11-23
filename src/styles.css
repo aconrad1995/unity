@@ -26,6 +26,10 @@
   --line: 1.5px solid #17121c;
   /* Band stitching: a dashed white seam, top and bottom. */
   --stitch: linear-gradient(90deg, rgba(255, 255, 255, 0.85) 50%, transparent 0);
+  /* Woven bands: a fine twill over every band, a jacquard print in a deeper shade of the band's color,
+     and a plastic slider lock that carries the name. Each event's band gets its own print (data-print). */
+  --twill: repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.16) 0 1px, transparent 1px 4px), repeating-linear-gradient(25deg, rgba(23, 18, 28, 0.06) 0 1px, transparent 1px 3px);
+  --print: none;
 
   --display: 'Archivo', system-ui, sans-serif;
   --wide: 'Archivo', system-ui, sans-serif;
@@ -81,26 +85,32 @@ img, svg { display: block; }
   position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px;
   min-height: 60px; padding: 0 36px; overflow: hidden;
   border-radius: 10px;
-  background: var(--stitch) 0 6px / 10px 2px repeat-x, var(--stitch) 0 calc(100% - 6px) / 10px 2px repeat-x, var(--bar);
+  --band: var(--bar);
+  background: var(--stitch) 0 6px / 10px 2px repeat-x, var(--stitch) 0 calc(100% - 6px) / 10px 2px repeat-x, var(--twill), var(--print), var(--band);
 }
 .top-small { padding: calc(env(safe-area-inset-top) + 12px) max(16px, calc((100% - 1048px) / 2)) 12px; }
 .top-small .top-inner { padding: 0 36px; justify-content: flex-start; }
 /* the snap holes at each end of the band */
 .top-brand::before, .top-brand::after, .top-small .top-inner::before, .top-small .top-inner::after, .tabbar::before, .tabbar::after {
-  content: ''; position: absolute; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%;
-  background: var(--sky); box-shadow: inset 0 0 0 2px rgba(23, 18, 28, 0.3);
+  content: ''; position: absolute; top: 50%; width: 14px; height: 14px; margin-top: -7px; border-radius: 50%;
+  background: radial-gradient(circle, var(--sky) 0 3.5px, #6f6a76 4px, #f4f2f7 5px, #bdb8c4 6px, #77727e 7px);
 }
 .top-brand::before, .top-small .top-inner::before, .tabbar::before { left: 12px; }
 .top-brand::after, .top-small .top-inner::after, .tabbar::after { right: 12px; }
 .cloud-edge { display: none; }
 
 .wordmark {
-  font: 800 2rem/1 var(--wide); font-stretch: 75%;
+  font: 800 1.75rem/1 var(--wide); font-stretch: 75%;
   color: var(--ink);
   display: inline-flex; align-items: center; width: fit-content;
 }
-.top-title { font: 800 1.5rem/1 var(--wide); font-stretch: 75%; text-transform: uppercase; color: var(--ink); text-wrap: balance; white-space: nowrap; }
-.band-print { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; font: 800 1.5rem/1 var(--wide); font-stretch: 75%; text-transform: uppercase; color: rgba(23, 18, 28, 0.28); }
+/* the slider lock: a white plastic tab with grip ribs on its right end */
+.wordmark, .top-title, .slider {
+  padding: 6px 26px 6px 12px; border: 2px solid var(--ink); border-radius: 8px;
+  background: repeating-linear-gradient(90deg, var(--ink) 0 2px, transparent 2px 5px) right 7px center / 11px 55% no-repeat, var(--cloud);
+}
+.top-title { font: 800 1.375rem/1 var(--wide); font-stretch: 75%; text-transform: uppercase; color: var(--ink); white-space: nowrap; }
+.band-print { display: none; }
 .back {
   width: 40px; height: 40px; display: grid; place-items: center; flex: none;
   background: var(--cloud); border-radius: 50%;
@@ -326,11 +336,12 @@ select:focus-visible, .field input:focus-visible, .field textarea:focus-visible 
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
   height: calc(var(--tab-h) + env(safe-area-inset-bottom)); padding: 0 28px env(safe-area-inset-bottom);
   display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; gap: 4px;
-  background: var(--stitch) 0 5px / 10px 2px repeat-x, var(--stitch) 0 calc(100% - 5px - env(safe-area-inset-bottom)) / 10px 2px repeat-x, var(--bar);
+  --band: var(--bar);
+  background: var(--stitch) 0 5px / 10px 2px repeat-x, var(--stitch) 0 calc(100% - 5px - env(safe-area-inset-bottom)) / 10px 2px repeat-x, var(--twill), var(--print), var(--band);
 }
 .tabbar::before, .tabbar::after { margin-top: -12px; }
 .tab { position: relative; display: grid; justify-items: center; gap: 2px; padding: 6px 4px; border-radius: 12px; font-weight: 700; font-size: 0.75rem; color: var(--ink); }
-.tab[aria-current='page'] { background: var(--cloud); }
+.tab[aria-current='page'] { background: var(--cloud); box-shadow: inset 0 0 0 2px var(--ink); }
 .tab > svg { margin: 2px 0; }
 .tab-sell-bubble {
   width: 44px; height: 28px; display: grid; place-items: center;
@@ -486,8 +497,10 @@ select:disabled { opacity: 0.55; }
 .month-h { font: 800 1.75rem/1 var(--wide); font-stretch: 75%; text-transform: uppercase; margin: 0 0 14px; padding-bottom: 12px; background: var(--stitch) 0 100% / 10px 2px repeat-x; background-color: transparent; background-image: repeating-linear-gradient(90deg, var(--ink) 0 6px, transparent 6px 12px); background-size: 100% 2px; background-repeat: no-repeat; background-position: 0 100%; }
 .event { --band: var(--pink-hot); position: relative; display: grid; grid-template-columns: 88px minmax(0, 1fr); background: var(--cloud); border: var(--line); border-radius: var(--r-card); overflow: hidden; }
 /* the stub: the event's own band color, torn off along a perforation */
-.event-date { display: grid; align-content: center; justify-items: center; gap: 2px; padding: 16px 0; background: var(--band); color: var(--ink); border-right: 2px dashed var(--ink); }
-.event-date span { font: 700 0.875rem/1 var(--text); }
+.event-date { display: grid; align-content: center; justify-items: center; padding: 16px 10px; color: var(--ink); border-right: 2px dashed var(--ink);
+  background: var(--twill), var(--print), var(--band); }
+.event-date > div { display: grid; justify-items: center; gap: 2px; width: 100%; padding: 8px 4px 10px; border: 2px solid var(--ink); border-radius: 8px; background: var(--cloud); }
+.event-date span { font: 700 0.8125rem/1 var(--text); text-transform: uppercase; }
 .event-date strong { font: 800 2.5rem/1 var(--wide); font-stretch: 75%; font-variant-numeric: tabular-nums; }
 .event-date small { font-size: 0.75rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .event-main { display: grid; gap: 4px; min-width: 0; padding: 16px; }
@@ -506,8 +519,9 @@ select:disabled { opacity: 0.55; }
 /* the printed band across the top of the lead event */
 .event-band { grid-column: 1 / -1; overflow: hidden; white-space: nowrap; padding: 12px 0; border-bottom: var(--line); color: var(--ink);
   font: 800 1.125rem/1 var(--wide); font-stretch: 75%; text-transform: uppercase;
-  background: var(--stitch) 0 4px / 10px 2px repeat-x, var(--stitch) 0 calc(100% - 4px) / 10px 2px repeat-x, var(--band); }
-.event-band span { display: inline-block; padding-left: 16px; }
+  background: var(--stitch) 0 4px / 10px 2px repeat-x, var(--stitch) 0 calc(100% - 4px) / 10px 2px repeat-x, var(--twill), var(--print), var(--band); }
+/* the name is woven into a plain lane in the band's own color, so it reads over the print */
+.event-band span { display: inline-block; margin-left: 16px; padding: 3px 8px; background: var(--band); }
 .event-feature { grid-template-columns: 112px minmax(0, 1fr); }
 .event-feature .event-date strong { font-size: 3.5rem; }
 .event-feature .event-main { padding: 20px; }
@@ -554,3 +568,33 @@ thead th { font-size: 0.8125rem; color: var(--ink-soft); border-bottom: 2px soli
 .btn-wide { width: 100%; }
 
 .photo .floor { fill: var(--floor); }
+
+/* ---------- Band prints ---------- */
+/* Woven in a deeper shade of the band (--weave), with a lighter thread (--sheen) on some. */
+[data-print], .top-brand, .top-small .top-inner, .tabbar {
+  --weave: color-mix(in srgb, var(--band), #17121c 24%);
+  --sheen: color-mix(in srgb, var(--band), #ffffff 45%);
+}
+.top-brand, .top-small .top-inner, .tabbar, [data-print='chevron'] {
+  --print: linear-gradient(135deg, var(--weave) 25%, transparent 25%) -9px 0 / 18px 18px,
+    linear-gradient(225deg, var(--weave) 25%, transparent 25%) -9px 0 / 18px 18px,
+    linear-gradient(315deg, var(--weave) 25%, transparent 25%) 0 0 / 18px 18px,
+    linear-gradient(45deg, var(--weave) 25%, transparent 25%) 0 0 / 18px 18px;
+}
+[data-print='check'] { --print: repeating-conic-gradient(var(--weave) 0 25%, transparent 0 50%) 0 0 / 14px 14px; }
+[data-print='stripe'] { --print: repeating-linear-gradient(-45deg, var(--weave) 0 5px, transparent 5px 9px, var(--sheen) 9px 11px, transparent 11px 15px); }
+[data-print='dots'] { --print: radial-gradient(circle, var(--weave) 0 2.5px, transparent 3px) 0 0 / 12px 12px, radial-gradient(circle, var(--sheen) 0 1.5px, transparent 2px) 6px 6px / 12px 12px; }
+[data-print='diamond'] { --print: linear-gradient(45deg, transparent 40%, var(--weave) 40% 60%, transparent 60%) 0 0 / 14px 14px, linear-gradient(-45deg, transparent 40%, var(--weave) 40% 60%, transparent 60%) 0 0 / 14px 14px; }
+[data-print='scales'] { --print: radial-gradient(circle at 50% 100%, transparent 0 5px, var(--weave) 5.5px 7.5px, transparent 8px) 0 0 / 16px 9px, radial-gradient(circle at 50% 100%, transparent 0 5px, var(--weave) 5.5px 7.5px, transparent 8px) 8px 4.5px / 16px 9px; }
+
+/* ---------- Countdown to your next festival ---------- */
+.countdown { --band: var(--pink-hot); display: grid; grid-template-columns: 104px minmax(0, 1fr); background: var(--cloud); border: var(--line); border-radius: var(--r-card); overflow: hidden; margin-bottom: 12px; transition: transform 0.2s var(--ease); }
+.countdown:active { transform: scale(0.99); }
+.countdown .event-date strong { font-size: 3rem; }
+.countdown-main { display: grid; align-content: center; gap: 4px; min-width: 0; padding: 14px 16px; }
+.countdown-main h2 { font: 800 1.75rem/1 var(--wide); font-stretch: 75%; text-transform: uppercase; overflow-wrap: anywhere; }
+.countdown-main p { color: var(--ink-soft); }
+.countdown-main .countdown-when { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+.countdown-more { font-size: 0.875rem; }
+.countdown-empty { display: grid; gap: 8px; justify-items: start; padding: 16px; background: var(--cloud); border: 1.5px dashed var(--ink); border-radius: var(--r-card); }
+.countdown-empty p { color: var(--ink-soft); }

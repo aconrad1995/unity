@@ -4,6 +4,7 @@ import { APP_NAME, BRANDS, SIZES, UP_FOR, VIBES, cleanBrand } from '../data'
 import { applyMoveCode, moveCode, shrinkPhoto, useProfile, type Store } from '../store'
 import { readTaste, resetTaste, topOf } from '../taste'
 import { Card } from './Card'
+import { Countdown } from './Countdown'
 import { PageHeader } from './PageHeader'
 import { RoleBadge } from './Team'
 
@@ -78,6 +79,7 @@ export default function ProfilePage({ store }: { store: Store }) {
     <>
       <PageHeader title="You" noBack />
       <main className="page profile">
+        <Countdown prompt />
         <section className="step me">
           <label className="me-photo">
             <Avatar profile={profile} />

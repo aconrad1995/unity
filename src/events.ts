@@ -42,9 +42,10 @@ export interface RaveEvent {
   via?: 'EDMTrain'
 }
 
-let n = 0
+/** Ids come from the name and start date, so adding or reordering events never changes someone else's. */
+const slug = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 const e = (name: string, city: string, place: string, lat: number, lng: number, date: string, days: number, url: string, note?: string): RaveEvent => ({
-  id: `event-${++n}`, name, city, place, lat, lng, date, days, url, note,
+  id: `${slug(name)}-${date}`, name, city, place, lat, lng, date, days, url, note,
 })
 
 /** Real festivals with dates announced as of 22 Nov 2026. Add new ones here; keep the source link. */
@@ -65,6 +66,13 @@ const EVENTS: RaveEvent[] = [
   e('Escape Halloween', 'San Bernardino, CA', 'NOS Event Center', 34.1083, -117.2898, '2027-10-29', 2, 'https://escapehalloween.com'),
 ]
 
+/** The last day of an event, as YYYY-MM-DD. */
+export function lastDay(ev: { date: string; days: number }) {
+  const d = new Date(`${ev.date}T12:00:00`)
+  d.setDate(d.getDate() + ev.days - 1)
+  return d.toISOString().slice(0, 10)
+}
+
 const words = (x: string) => x.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter((w) => w.length > 2)
 const sameEvent = (a: RaveEvent, b: RaveEvent) => {
   const close = Math.abs(new Date(a.date).getTime() - new Date(b.date).getTime()) <= 3 * 86400000
@@ -75,7 +83,11 @@ const sameEvent = (a: RaveEvent, b: RaveEvent) => {
 /** The hand-checked list, plus whatever EDMTrain has when the server holds a key. Our own entries win on a match. */
 /** Each event gets its own wristband color, the way a festival picks a new one every year. */
 const BANDS = ['#ff2e93', '#ffd93d', '#8fb4ff', '#7de8c0', '#c3a8ff', '#ff9d4d']
-export const bandColor = (id: string) => BANDS[[...id].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7) % BANDS.length]
+const PRINTS = ['chevron', 'check', 'stripe', 'dots', 'diamond', 'scales'] as const
+const hashId = (id: string) => [...id].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7)
+export const bandColor = (id: string) => BANDS[hashId(id) % BANDS.length]
+/** The woven print on the band. Picked apart from the color, so two pink bands still look different. */
+export const bandPrint = (id: string) => PRINTS[Math.floor(hashId(id) / BANDS.length) % PRINTS.length]
 
 export async function loadEvents(): Promise<RaveEvent[]> {
   let extra: RaveEvent[] = []
