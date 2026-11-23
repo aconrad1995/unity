@@ -86,17 +86,17 @@ img, svg { display: block; }
   min-height: 60px; padding: 0 36px; overflow: hidden;
   border-radius: 10px;
   --band: var(--bar);
-  background: var(--stitch) 0 6px / 10px 2px repeat-x, var(--stitch) 0 calc(100% - 6px) / 10px 2px repeat-x, var(--twill), var(--print), var(--band);
+  background: var(--edge) 0 5px / 100% 3px no-repeat, var(--edge) 0 calc(100% - 5px) / 100% 3px no-repeat, var(--twill), var(--print), var(--band);
 }
 .top-small { padding: calc(env(safe-area-inset-top) + 12px) max(16px, calc((100% - 1048px) / 2)) 12px; }
 .top-small .top-inner { padding: 0 36px; justify-content: flex-start; }
 /* the snap holes at each end of the band */
-.top-brand::before, .top-brand::after, .top-small .top-inner::before, .top-small .top-inner::after, .tabbar::before, .tabbar::after {
+.top-brand::before, .top-brand::after, .top-small .top-inner::before, .top-small .top-inner::after {
   content: ''; position: absolute; top: 50%; width: 14px; height: 14px; margin-top: -7px; border-radius: 50%;
   background: radial-gradient(circle, var(--sky) 0 3.5px, #6f6a76 4px, #f4f2f7 5px, #bdb8c4 6px, #77727e 7px);
 }
-.top-brand::before, .top-small .top-inner::before, .tabbar::before { left: 12px; }
-.top-brand::after, .top-small .top-inner::after, .tabbar::after { right: 12px; }
+.top-brand::before, .top-small .top-inner::before { left: 12px; }
+.top-brand::after, .top-small .top-inner::after { right: 12px; }
 .cloud-edge { display: none; }
 
 .wordmark {
@@ -334,14 +334,14 @@ select:focus-visible, .field input:focus-visible, .field textarea:focus-visible 
 /* ---------- Bottom bar: the band fastened around the screen's edge ---------- */
 .tabbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
-  height: calc(var(--tab-h) + env(safe-area-inset-bottom)); padding: 0 28px env(safe-area-inset-bottom);
+  height: calc(var(--tab-h) + env(safe-area-inset-bottom)); padding: 0 12px env(safe-area-inset-bottom);
   display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; gap: 4px;
-  --band: var(--bar);
-  background: var(--stitch) 0 5px / 10px 2px repeat-x, var(--stitch) 0 calc(100% - 5px - env(safe-area-inset-bottom)) / 10px 2px repeat-x, var(--twill), var(--print), var(--band);
+  background: var(--cloud); border-top: var(--line);
 }
-.tabbar::before, .tabbar::after { margin-top: -12px; }
+.tabbar::before, .tabbar::after { display: none; }
 .tab { position: relative; display: grid; justify-items: center; gap: 2px; padding: 6px 4px; border-radius: 12px; font-weight: 700; font-size: 0.75rem; color: var(--ink); }
-.tab[aria-current='page'] { background: var(--cloud); box-shadow: inset 0 0 0 2px var(--ink); }
+.tab { color: var(--ink-soft); }
+.tab[aria-current='page'] { color: var(--ink); background: var(--pink-soft); }
 .tab > svg { margin: 2px 0; }
 .tab-sell-bubble {
   width: 44px; height: 28px; display: grid; place-items: center;
@@ -375,7 +375,7 @@ select:focus-visible, .field input:focus-visible, .field textarea:focus-visible 
 .seller-card { display: flex; align-items: center; gap: 12px; background: var(--cloud); border-radius: 18px; padding: 10px 14px; }
 .seller-card strong { display: block; }
 .seller-upfor { display: block; color: var(--ink-soft); font-size: 0.9375rem; }
-.tab-count { position: absolute; top: 4px; left: calc(50% + 6px); min-width: 20px; height: 20px; padding: 0 5px; display: grid; place-items: center; border-radius: var(--r-pill); background: var(--pink-hot); color: var(--ink); font-size: 0.75rem; font-weight: 700; }
+.tab-count { z-index: 1; position: absolute; top: 4px; left: calc(50% + 6px); min-width: 20px; height: 20px; padding: 0 5px; display: grid; place-items: center; border-radius: var(--r-pill); background: var(--pink-hot); color: var(--ink); font-size: 0.75rem; font-weight: 700; }
 
 .for-you { margin: 0 0 12px; font-size: 0.875rem; font-weight: 500; color: var(--ink-soft); }
 
@@ -571,11 +571,17 @@ thead th { font-size: 0.8125rem; color: var(--ink-soft); border-bottom: 2px soli
 
 /* ---------- Band prints ---------- */
 /* Woven in a deeper shade of the band (--weave), with a lighter thread (--sheen) on some. */
-[data-print], .top-brand, .top-small .top-inner, .tabbar {
-  --weave: color-mix(in srgb, var(--band), #17121c 24%);
-  --sheen: color-mix(in srgb, var(--band), #ffffff 45%);
+[data-print] {
+  --weave: color-mix(in srgb, var(--band), #17121c 11%);
+  --sheen: color-mix(in srgb, var(--band), #ffffff 30%);
 }
-.top-brand, .top-small .top-inner, .tabbar, [data-print='chevron'] {
+/* The house band: like a real festival band, the name woven over and over, tone on tone,
+   between two contrasting edge stripes. */
+.top-brand, .top-small .top-inner {
+  --edge: linear-gradient(var(--gold), var(--gold));
+  --print: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='132' height='60'%3E%3Cg font-family='Arial Black,Arial,sans-serif' font-weight='900' font-size='14' letter-spacing='1' fill='%23e8157f'%3E%3Ctext x='0' y='25'%3EUNITY %E2%9C%A6 RAVE %E2%9C%A6%3C/text%3E%3Ctext x='-66' y='51'%3EUNITY %E2%9C%A6 RAVE %E2%9C%A6 UNITY %E2%9C%A6 RAVE %E2%9C%A6%3C/text%3E%3C/g%3E%3C/svg%3E") 0 0 / 132px 60px;
+}
+[data-print='chevron'] {
   --print: linear-gradient(135deg, var(--weave) 25%, transparent 25%) -9px 0 / 18px 18px,
     linear-gradient(225deg, var(--weave) 25%, transparent 25%) -9px 0 / 18px 18px,
     linear-gradient(315deg, var(--weave) 25%, transparent 25%) 0 0 / 18px 18px,
