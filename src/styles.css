@@ -216,7 +216,7 @@ select:focus-visible, .field input:focus-visible, .field textarea:focus-visible 
 .edit-listing { display: grid; gap: 16px; }
 .card-body { padding: 12px 12px 16px; display: grid; gap: 4px; }
 .card-brand { font-size: 0.8125rem; font-weight: 500; color: var(--accent-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.card-title { font: 500 1rem/1.25 var(--text); color: var(--ink); overflow-wrap: anywhere; }
+.card-title { font: 500 1rem/1.25 var(--text); color: var(--ink); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
 .card-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .size-pill, .cond { padding: 4px 8px; border-radius: var(--r-pill); font-size: 0.8125rem; font-weight: 500; background: var(--lilac); color: var(--ink); }
 .cond-new { background: var(--gold); }

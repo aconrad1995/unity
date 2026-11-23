@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { ChatIcon, ListingImage, SendIcon } from '../art'
-import { APP_NAME } from '../data'
+import { APP_NAME, money } from '../data'
 import { NO_ONE, nameOf, readProfile, type Store } from '../store'
 import { Avatar } from './ProfilePage'
 import { PageHeader } from './PageHeader'
@@ -138,7 +138,7 @@ export function ChatThread({ store, user, listingId }: { store: Store; user: str
             <span>
               <span className="hint">Chatting about</span>
               <strong>{about.title}</strong>
-              <span>${about.price} · {about.brand} · {about.size}{about.status ? ` · ${about.status === 'sold' ? 'Sold' : 'Reserved'}` : ''}</span>
+              <span>{money(about.price)} ·{about.brand} · {about.size}{about.status ? ` · ${about.status === 'sold' ? 'Sold' : 'Reserved'}` : ''}</span>
             </span>
           </a>
         )}

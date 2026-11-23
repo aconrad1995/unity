@@ -15,6 +15,9 @@ export const BRANDS: readonly string[] = [
 ]
 
 /** Tidies a typed brand: trims it and uses the known spelling when there is one. */
+/** A price as shoppers read it: $45, $1,200. */
+export const money = (dollars: number): string => '$' + dollars.toLocaleString('en-US')
+
 export function cleanBrand(typed: string): string {
   const t = typed.trim().replace(/\s+/g, ' ')
   const known = [...FEATURED.map((f) => f.brand), ...BRANDS]
