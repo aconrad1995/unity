@@ -48,6 +48,7 @@ export function TeamPage({ store }: { store: Store }) {
             <p className="hint">You can remove any listing, look or rating that breaks the rules from its own page.</p>
           </section>
         ) : null}
+        {store.myRole && <ResetPassword store={store} />}
         {store.myRole ? (
           <section className="step">
             <h2 className="section-h section-h-in">Featured brand activity</h2>
@@ -140,5 +141,33 @@ export function ReportsPage({ store }: { store: Store }) {
         {done.length > 0 && <p className="hint">{done.length} handled {done.length === 1 ? 'report' : 'reports'}.</p>}
       </main>
     </>
+  )
+}
+
+/** For someone who forgot their password: after checking it's really them, the team sets a new one to tell them. */
+function ResetPassword({ store }: { store: Store }) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [msg, setMsg] = useState('')
+  const [ok, setOk] = useState(false)
+  return (
+    <form className="step" onSubmit={async (e: FormEvent) => {
+      e.preventDefault()
+      const why = await store.resetPassword(email.trim(), password)
+      setOk(!why)
+      setMsg(why || 'New password set. Tell them privately, and ask them to change it after signing in.')
+      if (!why) setPassword('')
+    }}>
+      <h2 className="section-h section-h-in">Reset a password</h2>
+      <p className="hint">Only after you’ve checked it’s really them, for example from a chat on their own account or their Instagram.</p>
+      <label className="field"><span>Their email</span>
+        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" autoCapitalize="none" spellCheck={false} maxLength={160} />
+      </label>
+      <label className="field"><span>New password for them</span>
+        <input type="text" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="off" autoCapitalize="none" spellCheck={false} minLength={8} maxLength={200} />
+      </label>
+      {msg && <p className={ok ? 'success' : 'error'} role={ok ? 'status' : 'alert'}>{msg}</p>}
+      <button type="submit" className="btn btn-soft" disabled={!email.trim() || password.length < 8}>Set new password</button>
+    </form>
   )
 }

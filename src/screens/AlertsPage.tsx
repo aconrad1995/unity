@@ -16,14 +16,14 @@ export default function AlertsPage({ store, alerts }: { store: Store; alerts: Al
 
   return (
     <>
-      <PageHeader title="New for you" />
+      <PageHeader title="Matches" />
       <main className="page">
         {!alerts.hasPrefs ? (
           <div className="empty">
             <span className="empty-art"><BellIcon /></span>
             <h2>Tell us what to look out for</h2>
             <p>Add your sizes and favorite brands to your profile. When someone lists a match, it shows up here.</p>
-            <a className="btn" href="#/you/prefs">Set my brands and sizes</a>
+            <a className="btn" href="#/you/style">Set my brands and sizes</a>
           </div>
         ) : alerts.matches.length === 0 ? (
           <div className="empty">

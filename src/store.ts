@@ -62,9 +62,9 @@ export interface Fit { lookId: string; note: string; at: number; by: string }
 export interface Report { id: string; by: string; user: string; reason: string; at: number; resolved?: number; evidence: Message[] }
 interface Shared {
   rev: number; me: string; listings: Listing[]; people: Record<string, Person>; messages: Message[]; blocked: string[]
-  roles: Record<string, Role>; myRole: Role; looks: Look[]; fit: Fit | null; ratings: Record<string, RatingSummary>
+  roles: Record<string, Role>; myRole: Role; looks: Look[]; fit: Fit | null; ratings: Record<string, RatingSummary>; account: string | null
 }
-const NOTHING: Shared = { rev: 0, me: '', listings: [], people: {}, messages: [], blocked: [], roles: {}, myRole: '', looks: [], fit: null, ratings: {} }
+const NOTHING: Shared = { rev: 0, me: '', listings: [], people: {}, messages: [], blocked: [], roles: {}, myRole: '', looks: [], fit: null, ratings: {}, account: null }
 
 export const NO_ONE: Person = { name: '', photo: '', upFor: [] }
 export const nameOf = (p: Person | undefined) => p?.name.trim() || 'Someone new'
@@ -106,12 +106,62 @@ export function moveCode(): string {
 export function applyMoveCode(code: string): boolean {
   const clean = code.trim().toLowerCase()
   if (!/^[0-9a-f]{64}$/.test(clean)) return false
+  return becomeKey(clean)
+}
+
+/* ---------- Accounts ----------
+   Signing in hands this browser the account's secret key. The public profile on the server then
+   wins over whatever this browser had, so a fresh phone never wipes your name or picture. */
+const ADOPT_KEY = 'unity.adopt.v1'
+function becomeKey(key: string): boolean {
   try {
-    localStorage.setItem(KEY_KEY, clean)
+    localStorage.setItem(KEY_KEY, key)
     localStorage.removeItem(OUTBOX_KEY)
+    localStorage.setItem(ADOPT_KEY, '1')
     return true
   } catch {
     return false
+  }
+}
+const ACCOUNT_WHY: Record<string, string> = {
+  bad_email: 'That email doesn’t look right. Check it and try again.',
+  weak_password: 'Use a password of at least 8 characters.',
+  email_taken: 'That email already has an account. Sign in instead.',
+  has_account: 'This phone is already signed in to an account.',
+  wrong_login: 'That email and password don’t match. Check them and try again.',
+  rate_limited: 'Too many tries. Wait a little while, then try again.',
+  no_account: 'This phone isn’t signed in.',
+}
+const accountWhy = (r: Reply) => (r.error && ACCOUNT_WHY[r.error]) || (r.status === 0 ? 'Unity can’t be reached. Check your connection.' : 'That didn’t work. Try again in a moment.')
+
+/** Signs this browser in to an account. Returns why it failed, or '' (then reload the page). */
+export async function signIn(email: string, password: string): Promise<string> {
+  const r = await call('POST', 'account/signin', { email, password })
+  const key = (r.data as unknown as { key?: string } | null)?.key
+  if (!key) return accountWhy(r)
+  return becomeKey(key) ? '' : 'This browser can’t save the sign-in. Turn off private browsing and try again.'
+}
+
+/** Signs this browser out: a fresh, empty identity, and the public profile on this phone is cleared. */
+export function signOut() {
+  try {
+    for (const k of [KEY_KEY, OUTBOX_KEY, READ_KEY, PROFILE_KEY, ADOPT_KEY]) localStorage.removeItem(k)
+  } catch {
+    /* nothing kept to clear */
+  }
+}
+
+async function photoAsDataUrl(url: string): Promise<string> {
+  try {
+    const blob = await (await fetch(url)).blob()
+    return await new Promise((ok) => {
+      const fr = new FileReader()
+      fr.onload = () => ok(typeof fr.result === 'string' ? fr.result : '')
+      fr.onerror = () => ok('')
+      fr.readAsDataURL(blob)
+    })
+  } catch {
+    return ''
   }
 }
 
@@ -206,6 +256,18 @@ export function useStore() {
           let moved = true
           for (const l of old) moved = take(await fetchData('POST', 'listings', l)) && moved
           if (moved) localStorage.removeItem(LISTINGS_KEY)
+        }
+        // Just signed in: take the name, picture and picks this account already has on the server.
+        let adopting = false
+        try { adopting = localStorage.getItem(ADOPT_KEY) === '1' } catch { /* no storage */ }
+        if (adopting) {
+          const theirs = latest.current.people[latest.current.me]
+          if (theirs) {
+            const photo = theirs.photo ? await photoAsDataUrl(theirs.photo) : ''
+            write(PROFILE_KEY, { ...readProfile(), name: theirs.name, photo, upFor: theirs.upFor, instagram: theirs.instagram ?? '' })
+            window.dispatchEvent(new Event('unity-profile'))
+          }
+          try { localStorage.removeItem(ADOPT_KEY) } catch { /* fine */ }
         }
         // Keep the public part of the profile (name, picture, "say hi about") up to date.
         const p = readProfile()
@@ -315,6 +377,19 @@ export function useStore() {
     return s.messages.some((m) => m.from === s.me && m.to === of) && s.messages.some((m) => m.from === of && m.to === s.me)
   }, [])
 
+  const signUp = useCallback(async (email: string, password: string) => {
+    const r = await call('POST', 'account/signup', { email, password })
+    return take(r.data) ? '' : accountWhy(r)
+  }, [take])
+  const changePassword = useCallback(async (current: string, next: string) => {
+    const r = await call('POST', 'account/password', { current, next })
+    return take(r.data) ? '' : r.error === 'wrong_login' ? 'Your current password isn’t right.' : accountWhy(r)
+  }, [take])
+  const resetPassword = useCallback(async (email: string, password: string) => {
+    const r = await call('POST', 'team/account-reset', { email, password })
+    return r.data ? '' : r.status === 404 ? 'No account uses that email.' : accountWhy(r)
+  }, [])
+
   const setBlocked = useCallback(async (user: string, on: boolean) => take(await fetchData('POST', 'block', { user, on })), [take])
   const report = useCallback(async (user: string, reason: string) => take(await fetchData('POST', 'report', { user, reason })), [take])
 
@@ -347,7 +422,7 @@ export function useStore() {
 
   return {
     listings, mine, saved, online, me: shared.me, people: shared.people, blocked: shared.blocked, chats, unread,
-    roles: shared.roles ?? {}, myRole: shared.myRole ?? '', looks: shared.looks ?? [], fit: shared.fit ?? null, ratings: shared.ratings ?? {},
+    roles: shared.roles ?? {}, myRole: shared.myRole ?? '', looks: shared.looks ?? [], fit: shared.fit ?? null, ratings: shared.ratings ?? {}, account: shared.account ?? null, signUp, changePassword, resetPassword,
     nameRefused: refusal === 'name', handleRefused: refusal === 'handle', rate, unrate, removeRating, canRate, addListing, editListing, removeListing, toggleSaved, sendMessage, retryMessage, discardMessage, setBlocked, report, markRead,
     addLook, removeLook, claimRole, pickFit, teamReports, resolveReport,
   }
@@ -411,6 +486,12 @@ export const readProfile = (): Profile => ({ ...EMPTY_PROFILE, ...read<Partial<P
 
 export function useProfile() {
   const [profile, setProfile] = useState<Profile>(readProfile)
+  // After signing in, the account's profile arrives from the server and replaces this one.
+  useEffect(() => {
+    const reload = () => setProfile(readProfile())
+    window.addEventListener('unity-profile', reload)
+    return () => window.removeEventListener('unity-profile', reload)
+  }, [])
   const [saveFailed, setSaveFailed] = useState(false)
   const update = useCallback((change: Partial<Profile>) => {
     setProfile((cur) => {
