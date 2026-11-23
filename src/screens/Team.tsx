@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Sparkle } from '../art'
+import { CheckIcon } from '../art'
 import { APP_NAME } from '../data'
 import { NO_ONE, nameOf, type Report, type Role, type Store } from '../store'
 import { PageHeader } from './PageHeader'
@@ -11,7 +11,6 @@ export function RoleBadge({ role }: { role: Role | undefined }) {
   if (!role) return null
   return (
     <span className={`role-badge role-${role}`}>
-      <Sparkle size={12} />
       {ROLE_LABEL[role]}
     </span>
   )
@@ -62,7 +61,7 @@ export function TeamPage({ store }: { store: Store }) {
             <button type="submit" className="btn" disabled={!code.trim() || busy}>{busy ? 'Checking' : 'Sign in'}</button>
           </form>
         )}
-        {result === 'ok' && <p className="success" role="status"><Sparkle size={22} /> Signed in. Welcome to the team.</p>}
+        {result === 'ok' && <p className="success" role="status"><CheckIcon /> Signed in. Welcome to the team.</p>}
         <p className="fineprint">
           Your team access lives on this phone. If you clear this browser’s data, or switch between Safari and the home-screen app, sign in again with the code.
         </p>

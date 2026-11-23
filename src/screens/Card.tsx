@@ -1,12 +1,10 @@
-import { useState } from 'react'
-import { HeartIcon, ListingImage, Sparkle } from '../art'
+import { HeartIcon, ListingImage } from '../art'
 import { conditionLabel, type Listing } from '../data'
 import type { Store } from '../store'
 import { noteListing } from '../taste'
 
 export function SaveButton({ store, id, big }: { store: Store; id: string; big?: boolean }) {
   const saved = store.saved.includes(id)
-  const [burst, setBurst] = useState(0)
   return (
     <button
       type="button"
@@ -16,7 +14,6 @@ export function SaveButton({ store, id, big }: { store: Store; id: string; big?:
       onClick={(e) => {
         e.preventDefault()
         if (!saved) {
-          setBurst((b) => b + 1)
           const l = store.listings.find((x) => x.id === id)
           if (l) noteListing(l, 3)
         }
@@ -25,13 +22,6 @@ export function SaveButton({ store, id, big }: { store: Store; id: string; big?:
     >
       <HeartIcon filled={saved} />
       {big && <span>{saved ? 'Saved' : 'Save'}</span>}
-      {burst > 0 && (
-        <span className="burst" key={burst} aria-hidden="true">
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <Sparkle key={i} size={14} className={`burst-s burst-${i}`} />
-          ))}
-        </span>
-      )}
     </button>
   )
 }

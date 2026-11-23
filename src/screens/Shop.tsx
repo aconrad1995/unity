@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BellIcon, HeartIcon, SearchIcon, Sparkle } from '../art'
+import { BellIcon, CameraIcon, HeartIcon, SearchIcon } from '../art'
 import type { Alerts } from '../alerts'
 import { APP_NAME, CATEGORIES, FEATURED, SIZES, conditionLabel, featuredFor } from '../data'
 import { bumpStat, readProfile, type Store } from '../store'
@@ -77,7 +77,6 @@ export default function Shop({ store, alerts, initialBrand = '' }: { store: Stor
           <div className="top-brand">
             <a href="#/" className="wordmark">
               {APP_NAME}
-              <Sparkle size={18} className="wordmark-star" />
             </a>
             <span className="top-links">
               <a href="#/alerts" className="saved-link bell-link" aria-label={alerts.fresh > 0 ? `New for you: ${alerts.fresh} new ${alerts.fresh === 1 ? 'outfit' : 'outfits'}` : 'New for you'}>
@@ -102,7 +101,6 @@ export default function Shop({ store, alerts, initialBrand = '' }: { store: Stor
             />
           </label>
         </div>
-        <div className="cloud-edge" aria-hidden="true" />
       </header>
 
       <main className="page">
@@ -125,7 +123,6 @@ export default function Shop({ store, alerts, initialBrand = '' }: { store: Stor
                     setBrand(brand === b ? '' : b)
                   }}
                 >
-                  {isFeatured && <Sparkle size={14} />}
                   {b}
                 </button>
               )
@@ -136,9 +133,9 @@ export default function Shop({ store, alerts, initialBrand = '' }: { store: Stor
         <section aria-labelledby="type-h">
           <h2 id="type-h" className="row-h">What are you looking for?</h2>
           <div className="bubbles" role="group" aria-label="Type">
-            <button type="button" className="bubble bubble-blue" aria-pressed={category === ''} onClick={() => setCategory('')}>Everything</button>
+            <button type="button" className="bubble" aria-pressed={category === ''} onClick={() => setCategory('')}>Everything</button>
             {CATEGORIES.map((c) => (
-              <button key={c} type="button" className="bubble bubble-blue" aria-pressed={category === c} onClick={() => { if (category !== c) note('categories', c); setCategory(category === c ? '' : c) }}>
+              <button key={c} type="button" className="bubble" aria-pressed={category === c} onClick={() => { if (category !== c) note('categories', c); setCategory(category === c ? '' : c) }}>
                 {c}
               </button>
             ))}
@@ -189,7 +186,6 @@ export default function Shop({ store, alerts, initialBrand = '' }: { store: Stor
 
         {sort === 'you' && results.length > 0 && (
           <p className="for-you">
-            <Sparkle size={16} />
             {personal
               ? 'Best matches first, based on your searches, taps and profile.'
               : 'Search, tap brands or fill in your profile and your best matches will show first.'}
@@ -224,7 +220,7 @@ function InspoStrip({ store }: { store: Store }) {
   const who = fit ? store.people[fit.ownerId]?.name.trim() : ''
   return (
     <a className="inspo-strip" href="#/inspo">
-      {fit ? <img src={`/api/photo/${fit.id}/0`} alt="" /> : <span className="inspo-strip-art"><Sparkle size={26} /></span>}
+      {fit ? <img src={`/api/photo/${fit.id}/0`} alt="" /> : <span className="inspo-strip-art"><CameraIcon /></span>}
       <span>
         <strong>{fit ? 'Fit of the week' : 'Inspo'}</strong>
         <span>{fit ? `${who || 'Someone'} wearing ${fit.brands.slice(0, 2).join(' and ') || 'their best look'}` : 'See how people style their outfits, and post yours'}</span>

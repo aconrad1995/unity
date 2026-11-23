@@ -1,5 +1,5 @@
-// Events portal data. The events below are made-up samples so the screen can be tried out.
-// To go live, replace loadEvents() with a call to a real feed (for example EDMTrain or Ticketmaster).
+// Events portal data: real festivals, added by hand with a source link for each.
+// To go live with more, replace loadEvents() with a call to a real feed (for example EDMTrain or Ticketmaster).
 
 export interface City { name: string; lat: number; lng: number }
 
@@ -34,49 +34,54 @@ export interface RaveEvent {
   /** ISO date of the first day */
   date: string
   days: number
-  /** expected crowd; this is what "biggest" sorts by */
-  crowd: number
-  sounds: string[]
-  sample: boolean
-}
-
-const city = (name: string) => CITIES.find((c) => c.name === name)!
-const inDays = (n: number) => {
-  const d = new Date()
-  d.setHours(12, 0, 0, 0)
-  d.setDate(d.getDate() + n)
-  return d.toISOString().slice(0, 10)
+  /** Where the dates come from; the festival's own page or press release where we found one. */
+  url: string
+  /** Shown on the card when the dates are not yet on an official page. */
+  note?: string
+  /** Set on events pulled from EDMTrain. */
+  via?: 'EDMTrain'
 }
 
 let n = 0
-const e = (name: string, where: string, place: string, days: number, length: number, crowd: number, sounds: string[]): RaveEvent => {
-  const c = city(where)
-  return { id: `sample-event-${++n}`, name, city: where, place, lat: c.lat, lng: c.lng, date: inDays(days), days: length, crowd, sounds, sample: true }
-}
+const e = (name: string, city: string, place: string, lat: number, lng: number, date: string, days: number, url: string, note?: string): RaveEvent => ({
+  id: `event-${++n}`, name, city, place, lat, lng, date, days, url, note,
+})
 
-const SAMPLE_EVENTS: RaveEvent[] = [
-  e('Cotton Candy Skies', 'Los Angeles, CA', 'Outdoor fairground', 12, 2, 45000, ['House', 'Bass']),
-  e('Bubble Bass Bash', 'Los Angeles, CA', 'Warehouse district', 26, 1, 6000, ['Dubstep', 'Drum & bass']),
-  e('Sparkle Harbor', 'San Diego, CA', 'Waterfront park', 33, 2, 28000, ['House', 'Techno']),
-  e('Starlight Carousel', 'Las Vegas, NV', 'Speedway grounds', 47, 3, 90000, ['Everything']),
-  e('Moonbeam Meadow', 'San Francisco, CA', 'City park', 19, 2, 35000, ['House', 'Disco']),
-  e('Pastel Planet', 'Phoenix, AZ', 'Desert park', 40, 2, 22000, ['Trance', 'House']),
-  e('Dreamcloud Nights', 'Seattle, WA', 'Indoor arena', 54, 1, 12000, ['Bass', 'Trap']),
-  e('Halo Fields', 'Denver, CO', 'Open-air amphitheatre', 22, 2, 18000, ['Bass', 'Dubstep']),
-  e('Sugar Rush Sound Fest', 'Dallas, TX', 'Fair park', 61, 2, 30000, ['House', 'Hardstyle']),
-  e('Twinkle Town', 'Austin, TX', 'Lakeside grounds', 30, 1, 9000, ['Techno']),
-  e('Glitterwave Weekend', 'Miami, FL', 'Bayfront park', 16, 3, 70000, ['House', 'Techno', 'Trance']),
-  e('Candy Comet', 'Orlando, FL', 'Stadium grounds', 75, 2, 55000, ['Everything']),
-  e('Prism Parade', 'Chicago, IL', 'Lakefront park', 36, 3, 60000, ['House', 'Bass']),
-  e('Lullabass', 'Detroit, MI', 'Riverfront plaza', 50, 2, 25000, ['Techno', 'House']),
-  e('Neon Lullaby', 'New York, NY', 'Island park', 9, 2, 50000, ['House', 'Techno']),
-  e('Confetti Coast', 'Boston, MA', 'Harbor pavilion', 44, 1, 8000, ['Trance']),
-  e('Peach Fizz Festival', 'Atlanta, GA', 'Raceway grounds', 28, 3, 65000, ['Bass', 'House']),
-  e('Capitol Glow', 'Washington, DC', 'Stadium lots', 58, 2, 32000, ['House', 'Drum & bass']),
+/** Real festivals with dates announced as of 22 Nov 2026. Add new ones here; keep the source link. */
+export const EVENTS_CHECKED = '22 Nov 2026'
+const EVENTS: RaveEvent[] = [
+  e('Decadence Colorado', 'Denver, CO', 'Colorado Convention Center', 39.7428, -104.9969, '2026-12-30', 2, 'https://www.edmtunes.com/2026/08/20/decadence-colorado-reveals-stacked-lineup-to-close-out-2026/'),
+  e('Forbidden Kingdom', 'Orlando, FL', 'Central Florida Fairgrounds', 28.553, -81.442, '2027-04-23', 3, 'https://press.insomniac.com/blog/forbidden-kingdom-will-return-to-central-florida-fairgrounds-in-2027'),
+  e('EDC Orlando', 'Orlando, FL', 'Tinker Field', 28.54, -81.4036, '2027-11-05', 3, 'https://edmidentity.com/2026/11/10/edc-orlando-2027-dates-tickets/'),
+  e('Tahoe Live', 'Olympic Valley, CA', 'Palisades Tahoe', 39.1969, -120.2358, '2026-12-11', 3, 'https://edmidentity.com/2026/09/15/tahoe-live-2026-lineup/'),
+  e('Countdown NYE', 'San Bernardino, CA', 'NOS Event Center', 34.1083, -117.2898, '2026-12-31', 2, 'https://press.insomniac.com/blog/countdown-nye-will-expand-to-two-days-and-return-to-nos-event-center-for-2026-festival'),
+  e('Ultra Music Festival', 'Miami, FL', 'Bayfront Park', 25.7743, -80.1862, '2027-03-26', 3, 'https://ultramusicfestival.com/tickets/miami/'),
+  e('Ubbi Dubbi', 'Fort Worth, TX', 'Panther Island Pavilion', 32.7634, -97.3363, '2027-04-23', 2, 'https://edmidentity.com/2026/11/04/ubbi-dubbi-2027-lineup/'),
+  e('EDC Las Vegas: Dusk', 'Las Vegas, NV', 'Las Vegas Motor Speedway', 36.2721, -115.0107, '2027-05-14', 3, 'https://press.insomniac.com/blog/edc-las-vegas-introduces-new-dusk-till-dawn-2027-12-day-festival-concept-spanning-two-consecutive-weekends'),
+  e('EDC Las Vegas: Dawn', 'Las Vegas, NV', 'Las Vegas Motor Speedway', 36.2721, -115.0107, '2027-05-21', 3, 'https://press.insomniac.com/blog/edc-las-vegas-introduces-new-dusk-till-dawn-2027-12-day-festival-concept-spanning-two-consecutive-weekends'),
+  e('Lightning in a Bottle', 'Bakersfield, CA', 'Buena Vista Aquatic Recreation Area', 35.1814, -119.3197, '2027-05-26', 5, 'https://edmidentity.com/2026/11/17/lightning-in-a-bottle-2027-lineup/'),
+  e('Movement Detroit', 'Detroit, MI', 'Hart Plaza', 42.3282, -83.0446, '2027-05-29', 3, 'https://movementfestival.com', 'Dates come from ticket listings. Check the official site.'),
+  e('Beyond Wonderland Midwest', 'Joliet, IL', 'Chicagoland Speedway', 41.4767, -88.0553, '2027-06-11', 3, 'https://press.insomniac.com/blog/beyond-wonderland-midwest-expands-to-three-days-debuts-new-venue-for-2027-edition'),
+  e('Escape Psycho Circus', 'San Bernardino, CA', 'NOS Event Center', 34.1083, -117.2898, '2027-10-29', 2, 'https://edmidentity.com/2026/11/03/escape-psycho-circus-2027-dates-tickets/'),
 ]
 
+const words = (x: string) => x.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter((w) => w.length > 2)
+const sameEvent = (a: RaveEvent, b: RaveEvent) => {
+  const close = Math.abs(new Date(a.date).getTime() - new Date(b.date).getTime()) <= 3 * 86400000
+  const wa = words(a.name), wb = words(b.name)
+  return close && wa.some((w) => wb.includes(w)) && milesBetween(a, b) < 60
+}
+
+/** The hand-checked list, plus whatever EDMTrain has when the server holds a key. Our own entries win on a match. */
 export async function loadEvents(): Promise<RaveEvent[]> {
-  return SAMPLE_EVENTS
+  let extra: RaveEvent[] = []
+  try {
+    const res = await fetch('/api/events')
+    if (res.ok) extra = ((await res.json()) as { events?: RaveEvent[] }).events ?? []
+  } catch {
+    /* offline or no feed: the checked list still works */
+  }
+  return [...EVENTS, ...extra.filter((x) => !EVENTS.some((own) => sameEvent(own, x)))]
 }
 
 /** Straight-line distance in miles. */
@@ -86,13 +91,6 @@ export function milesBetween(a: { lat: number; lng: number }, b: { lat: number; 
   const dLng = rad(b.lng - a.lng)
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2
   return 3959 * 2 * Math.asin(Math.sqrt(h))
-}
-
-export function sizeLabel(crowd: number): string {
-  if (crowd >= 50000) return 'Huge'
-  if (crowd >= 20000) return 'Big'
-  if (crowd >= 8000) return 'Medium'
-  return 'Small'
 }
 
 export function dateParts(iso: string, days: number) {

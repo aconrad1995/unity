@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { ListingImage, Sparkle } from '../art'
+import { CheckIcon, ListingImage } from '../art'
 import { CONDITIONS, SIZES, featuredFor, type ConditionId, type Listing, type Size } from '../data'
 import { NO_ONE, bumpStat, nameOf, type Store } from '../store'
 import { Avatar } from './ProfilePage'
@@ -63,7 +63,7 @@ export default function ListingPage({ store, id }: { store: Store; id: string })
       <main className="page detail">
         {justListed && (
           <div className="success listed-next" role="status">
-            <p><Sparkle size={22} /> Your outfit is listed. This is how buyers will see it.</p>
+            <p><CheckIcon /> Your outfit is listed. This is how buyers will see it.</p>
             <a className="btn" href="#/sell">List another outfit</a>
           </div>
         )}

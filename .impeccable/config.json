@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/styles.css"
+        ],
+        "createdAt": "2026-11-23T06:58:09.779Z",
+        "reason": "agent: false positive, a 3px full-width foil strip on the featured event card's top edge (the app's holographic signature), not a one-sided accent border; user asked for a futuristic rave look"
+      }
+    ]
+  }
+}
