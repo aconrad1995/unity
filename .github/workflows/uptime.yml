@@ -1,0 +1,28 @@
+# Checks unityrave.com every 15 minutes. If the site or its server is down for a few minutes
+# running, this run fails and GitHub emails whoever last changed this file's schedule.
+name: Uptime
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Site and server answer
+        run: |
+          for try in 1 2 3 4; do
+            if curl --fail --silent --show-error --max-time 20 -o /dev/null https://unityrave.com/ \
+              && curl --fail --silent --show-error --max-time 20 https://unityrave.com/api/going | grep -q counts; then
+              echo "unityrave.com is up"; exit 0
+            fi
+            echo "Not answering (try $try), checking again in 90 seconds"
+            sleep 90
+          done
+          echo "::error::unityrave.com has been down for about 5 minutes"
+          exit 1

@@ -15,6 +15,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID, 
 import { promisify } from 'node:util'
 import { closeSync, copyFileSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync, writeSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { writeBackup } from './backup.mjs'
 import { edmtrainEvents } from './edmtrain.mjs'
 import { mailReady, resetMail, sendMail, welcomeMail } from './mail.mjs'
 import { checkSubscription, daysBetween, pacificNow, sendPush, setupPush } from './push.mjs'
@@ -581,6 +582,24 @@ export async function api(req, res, next) {
       const same = want && typeof got === 'string' && got.length === want.length && timingSafeEqual(Buffer.from(got), Buffer.from(want))
       if (!same) throw new Refuse(404, 'not_found')
       return send(res, 200, { reports: db.reports })
+    }
+
+    // An encrypted copy of everything, fetched nightly by the GitHub backup job. Closed unless
+    // UNITY_BACKUP_TOKEN (32+ characters) is set; the same token is needed to open the file.
+    if (req.method === 'GET' && path === 'admin/backup') {
+      if (!allow(`backup:${ipOf(req)}`, 10, HOUR)) throw new Refuse(429, 'rate_limited')
+      const want = process.env.UNITY_BACKUP_TOKEN
+      const got = req.headers['x-unity-backup']
+      const same = want && want.length >= 32 && typeof got === 'string' && got.length === want.length && timingSafeEqual(Buffer.from(got), Buffer.from(want))
+      if (!same) throw new Refuse(404, 'not_found')
+      res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store', 'Content-Disposition': 'attachment; filename="unity-backup.bin"' })
+      try {
+        await writeBackup(DIR, want, res)
+      } catch (e) {
+        console.error('backup failed', e)
+        res.destroy() // the job sees a broken download, not a short file that looks fine
+      }
+      return
     }
 
     // Public festival listings from EDMTrain. Empty unless the host has a key.
