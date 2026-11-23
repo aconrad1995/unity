@@ -91,7 +91,14 @@ export default function Sell({ store, wornFrom }: { store: Store; wornFrom?: str
     if (!shipDays) next.ship = 'Pick how fast you can send it.'
     setErrors(next)
     if (Object.keys(next).length > 0 || !category || !size || !condition || !shipDays) {
-      setTimeout(() => document.querySelector('[data-error="true"]')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 50)
+      setTimeout(() => {
+        // Put the keyboard and screen reader on the first thing to fix, not the submit button.
+        const first = document.querySelector('[data-error="true"]')
+        const field = first?.previousElementSibling
+        const control = field?.matches('input, textarea, button') ? field : field?.querySelector<HTMLElement>('input, textarea, button')
+        ;(control as HTMLElement | null | undefined)?.focus({ preventScroll: true })
+        first?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      }, 50)
       return
     }
 
@@ -123,7 +130,11 @@ export default function Sell({ store, wornFrom }: { store: Store; wornFrom?: str
     window.location.hash = `#/item/${newId}`
   }
 
-  const err = (key: string) => errors[key] ? <p className="error" data-error="true" role="alert">{errors[key]}</p> : null
+  // Field errors are tied to their field and read when it gets focus; only a failed send interrupts.
+  const err = (key: string) => errors[key]
+    ? <p className="error" id={`sell-err-${key}`} data-error="true" role={key === 'form' ? 'alert' : undefined}>{errors[key]}</p>
+    : null
+  const about = (key: string) => errors[key] ? { 'aria-invalid': true, 'aria-describedby': `sell-err-${key}` } : {}
 
   return (
     <>
@@ -140,7 +151,7 @@ export default function Sell({ store, wornFrom }: { store: Store; wornFrom?: str
                   <strong>Tap to add photos</strong>
                   <span>Add a clear picture of the outfit you’re selling, taken in good lighting. Up to {MAX_PHOTOS} photos; the first one is the cover.</span>
                 </span>
-                <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => { void onPhotos(e.target.files); e.target.value = '' }} />
+                <input type="file" accept="image/*" multiple className="sr-only" {...about('photo')} onChange={(e) => { void onPhotos(e.target.files); e.target.value = '' }} />
               </label>
             ) : (
               <ul className="photo-grid" aria-label="Your photos">
@@ -171,7 +182,7 @@ export default function Sell({ store, wornFrom }: { store: Store; wornFrom?: str
             <legend><span className="step-n">2</span> Tell us what it is</legend>
             <label className="field">
               <span>Name</span>
-              <input value={title} onChange={(e) => { setTitle(e.target.value); fixed('title') }} placeholder="Pink sparkle two-piece set" maxLength={60} />
+              <input value={title} onChange={(e) => { setTitle(e.target.value); fixed('title') }} placeholder="Pink sparkle two-piece set" maxLength={60} {...about('title')} />
             </label>
             {err('title')}
             <label className="field">
@@ -184,6 +195,7 @@ export default function Sell({ store, wornFrom }: { store: Store; wornFrom?: str
                 placeholder="Start typing, like Badinka"
                 maxLength={40}
                 autoComplete="off"
+                {...about('brand')}
               />
               <datalist id="brand-list">
                 {BRANDS.map((b) => <option key={b} value={b} />)}
@@ -191,7 +203,7 @@ export default function Sell({ store, wornFrom }: { store: Store; wornFrom?: str
               <span className="hint">Pick from the list, or type any brand that isn’t on it.</span>
             </label>
             {err('brand')}
-            <div className="field" role="group" aria-labelledby="kind-l">
+            <div className="field" role="group" aria-labelledby="kind-l" {...about('category')}>
               <span id="kind-l">Kind of item</span>
               <div className="bubbles bubbles-wrap">
                 {CATEGORIES.map((c) => (
@@ -200,7 +212,7 @@ export default function Sell({ store, wornFrom }: { store: Store; wornFrom?: str
               </div>
             </div>
             {err('category')}
-            <div className="field" role="group" aria-labelledby="size-l">
+            <div className="field" role="group" aria-labelledby="size-l" {...about('size')}>
               <span id="size-l">Size</span>
               <div className="bubbles bubbles-wrap">
                 {SIZES.map((s) => (
@@ -213,7 +225,7 @@ export default function Sell({ store, wornFrom }: { store: Store; wornFrom?: str
 
           <fieldset className="step">
             <legend><span className="step-n">3</span> How worn is it?</legend>
-            <div className="choices">
+            <div className="choices" role="radiogroup" aria-label="How worn is it?" {...about('condition')}>
               {CONDITIONS.map((c) => (
                 <label key={c.id} className={`choice${condition === c.id ? ' is-on' : ''}`}>
                   <input type="radio" name="condition" className="sr-only" checked={condition === c.id} onChange={() => { setCondition(c.id); fixed('condition') }} />
@@ -246,12 +258,12 @@ export default function Sell({ store, wornFrom }: { store: Store; wornFrom?: str
               <span>Price in dollars</span>
               <span className="price-input">
                 <span aria-hidden="true">$</span>
-                <input inputMode="decimal" value={price} onChange={(e) => { setPrice(cleanPrice(e.target.value)); fixed('price') }} placeholder="e.g. 30" maxLength={7} />
+                <input inputMode="decimal" value={price} onChange={(e) => { setPrice(cleanPrice(e.target.value)); fixed('price') }} placeholder="e.g. 30" maxLength={7} {...about('price')} />
               </span>
             </label>
             <span className="hint">Whole dollars work best. Cents are rounded, so $45.50 lists as $46.</span>
             {err('price')}
-            <div className="field" role="group" aria-labelledby="ship-l">
+            <div className="field" role="group" aria-labelledby="ship-l" {...about('ship')}>
               <span id="ship-l">How fast can you send it?</span>
               <span className="hint">Buyers heading to a festival filter by what arrives in time.</span>
               <div className="bubbles bubbles-wrap">

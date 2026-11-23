@@ -1,5 +1,5 @@
 import { HeartIcon, ListingImage } from '../art'
-import { arrivesBy, conditionLabel, type Listing } from '../data'
+import { arrivesBy, conditionLabel, money, type Listing } from '../data'
 import type { Store } from '../store'
 import { noteListing } from '../taste'
 
@@ -33,7 +33,7 @@ export function Card({ listing, store }: { listing: Listing; store: Store }) {
       <a href={`#/item/${listing.id}`} className="card-link">
         <div className="card-photo">
           <ListingImage listing={listing} />
-          <span className="price-bubble">${listing.price}</span>
+          <span className="price-bubble">{money(listing.price)}</span>
           {listing.status && <span className={`status-flag status-${listing.status}`}>{listing.status === 'sold' ? 'Sold' : 'Reserved'}</span>}
         </div>
         <div className="card-body">

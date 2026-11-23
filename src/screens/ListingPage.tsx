@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { CheckIcon, ListingImage } from '../art'
-import { APP_NAME, CONDITIONS, SHIP_OPTIONS, SIZES, arrivesBefore, arrivesBy, featuredFor, type ConditionId, type Listing, type Size } from '../data'
+import { APP_NAME, CONDITIONS, SHIP_OPTIONS, SIZES, arrivesBefore, arrivesBy, featuredFor, money, type ConditionId, type Listing, type Size } from '../data'
 import { useGoing } from '../going'
 import { NO_ONE, bumpStat, nameOf, type Store } from '../store'
 import { Avatar } from './ProfilePage'
@@ -95,7 +95,7 @@ export default function ListingPage({ store, id }: { store: Store; id: string })
 
         <div className="detail-info">
           <h1 className="detail-title">{listing.title}</h1>
-          <p className="detail-price">${listing.price}</p>
+          <p className="detail-price">{money(listing.price)}</p>
 
           <dl className="facts">
             <div><dt>Brand</dt><dd>{listing.brand}</dd></div>
