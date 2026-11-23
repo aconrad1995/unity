@@ -552,6 +552,15 @@ export function bumpStat(brand: string, kind: StatKind) {
 const PROFILE_KEY = 'unity.profile.v1'
 export const readProfile = (): Profile => ({ ...EMPTY_PROFILE, ...read<Partial<Profile>>(PROFILE_KEY, {}) })
 
+/** Adds a brand to the shopper's favorites, so Matches tells them when it's listed. */
+export function addFavoriteBrand(brand: string): boolean {
+  const p = readProfile()
+  if (p.brands.some((b) => b.toLowerCase() === brand.toLowerCase())) return true
+  const ok = write(PROFILE_KEY, { ...p, brands: [...p.brands, brand] })
+  window.dispatchEvent(new Event('unity-profile'))
+  return ok
+}
+
 export function useProfile() {
   const [profile, setProfile] = useState<Profile>(readProfile)
   // After signing in, the account's profile arrives from the server and replaces this one.

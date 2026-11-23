@@ -1,16 +1,17 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { BellIcon, CameraIcon, HeartIcon, SearchIcon } from '../art'
 import type { Alerts } from '../alerts'
-import { APP_NAME, CATEGORIES, FEATURED, SIZES, arrivesBefore, arrivesBy, conditionLabel, featuredFor, type Listing } from '../data'
+import { APP_NAME, BRANDS, CATEGORIES, FEATURED, SIZES, arrivesBefore, arrivesBy, conditionLabel, featuredFor, type Listing } from '../data'
 import { useGoing } from '../going'
 import { usePageTitle } from './PageHeader'
 import { findEvent } from '../events'
-import { bumpStat, readProfile, type Store } from '../store'
+import { addFavoriteBrand, bumpStat, readProfile, type Store } from '../store'
 import { hasSignals, note, noteSearch, readTaste, score } from '../taste'
 import { Card } from './Card'
 import { BackFrom, Countdown } from './Countdown'
 
 type Sort = 'you' | 'new' | 'low' | 'high'
+type Filter = 'brand' | 'category' | 'size' | 'arrive' | 'query'
 
 export default function Shop({ store, alerts, initialBrand = '', forEvent }: { store: Store; alerts: Alerts; initialBrand?: string; forEvent?: string }) {
   const [query, setQuery] = useState('')
@@ -58,26 +59,34 @@ export default function Shop({ store, alerts, initialBrand = '', forEvent }: { s
     if (featured) bumpStat(featured.brand, 'bannerViews')
   }, [featured])
 
-  const results = useMemo(() => {
+  // One test per filter, so an empty shop can say which filter is hiding outfits.
+  const passes = useMemo(() => {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean)
-    const out = store.listings.filter((l) => {
-      if (brand && l.brand !== brand) return false
-      if (category && l.category !== category) return false
-      if (size === 'mine' ? !(profile.sizes.includes(l.size) || l.size === 'One size') : size && l.size !== size) return false
-      if (timeFilter && !arrivesBefore(l, timeFilter.date)) return false
-      if (arrive === 'week' || arrive === 'fortnight') {
-        const by = arrivesBy(l)
-        if (!by || by.getTime() > Date.now() + (arrive === 'week' ? 7 : 14) * 86_400_000) return false
+    return (l: Listing, skip?: Filter) => {
+      if (skip !== 'brand' && brand && l.brand !== brand) return false
+      if (skip !== 'category' && category && l.category !== category) return false
+      if (skip !== 'size' && (size === 'mine' ? !(profile.sizes.includes(l.size) || l.size === 'One size') : size && l.size !== size)) return false
+      if (skip !== 'arrive') {
+        if (timeFilter && !arrivesBefore(l, timeFilter.date)) return false
+        if (arrive === 'week' || arrive === 'fortnight') {
+          const by = arrivesBy(l)
+          if (!by || by.getTime() > Date.now() + (arrive === 'week' ? 7 : 14) * 86_400_000) return false
+        }
       }
+      if (skip === 'query') return true
       const hay = `${l.title} ${l.brand} ${l.category} ${l.size} ${conditionLabel(l.condition)} ${l.description} ${l.wornAt ?? ''}`.toLowerCase()
       return words.every((w) => hay.includes(w))
-    })
+    }
+  }, [query, brand, category, size, profile, timeFilter, arrive])
+
+  const results = useMemo(() => {
+    const out = store.listings.filter((l) => passes(l))
     if (sort === 'you') out.sort((a, b) => score(b, taste, profile) - score(a, taste, profile) || b.createdAt - a.createdAt)
     else if (sort === 'low') out.sort((a, b) => a.price - b.price)
     else if (sort === 'high') out.sort((a, b) => b.price - a.price)
     else out.sort((a, b) => b.createdAt - a.createdAt)
     return out
-  }, [store.listings, query, brand, category, size, sort, taste, profile, timeFilter, arrive])
+  }, [store.listings, passes, sort, taste, profile])
 
   const filtered = Boolean(query || brand || category || size || arrive)
   const clear = () => {
@@ -90,6 +99,31 @@ export default function Shop({ store, alerts, initialBrand = '', forEvent }: { s
   // Real outfits first. Samples only fill the shop until there is real stock, under their own heading.
   const real = results.filter((l) => !l.sample)
   const samples = results.filter((l) => l.sample)
+
+  // With no real outfits showing, name each filter that's hiding some, and how many.
+  const hiddenBy = useMemo(() => {
+    if (real.length > 0) return []
+    const active: { key: Filter; label: string; off: () => void }[] = [
+      ...(size ? [{ key: 'size' as const, label: size === 'mine' ? `your sizes (${profile.sizes.join(', ')})` : `Size ${size}`, off: () => setSize('') }] : []),
+      ...(category ? [{ key: 'category' as const, label: category, off: () => setCategory('') }] : []),
+      ...(brand ? [{ key: 'brand' as const, label: brand, off: () => setBrand('') }] : []),
+      ...(arrive ? [{ key: 'arrive' as const, label: timeFilter ? `Arrives before ${timeFilter.name}` : arrive === 'week' ? 'Arrives within a week' : 'Arrives within 2 weeks', off: () => setArrive('') }] : []),
+      ...(query.trim() ? [{ key: 'query' as const, label: `the search “${query.trim()}”`, off: () => setQuery('') }] : []),
+    ]
+    return active
+      .map((f) => ({ ...f, count: store.listings.filter((l) => !l.sample && passes(l, f.key)).length }))
+      .filter((f) => f.count > 0)
+  }, [real.length, size, category, brand, arrive, query, timeFilter, profile, store.listings, passes])
+
+  // A brand they searched for or picked, so an empty search can become a Match.
+  const wanted = useMemo(() => {
+    if (brand) return brand
+    const q = query.trim().toLowerCase()
+    if (q.length < 3) return ''
+    return [...listedBrands, ...BRANDS].find((b) => q.includes(b.toLowerCase())) ?? ''
+  }, [brand, query, listedBrands])
+  const [watching, setWatching] = useState('')
+  const alreadyWatching = wanted && (watching === wanted || readProfile().brands.some((b) => b.toLowerCase() === wanted.toLowerCase()))
 
   usePageTitle(brand ? `${brand} outfits` : picked ? `Outfits for ${picked.name}` : '')
   return (
@@ -206,30 +240,62 @@ export default function Shop({ store, alerts, initialBrand = '', forEvent }: { s
         )}
 
         <div className="results-bar" aria-live="polite">
-          <p>{real.length === 0 ? 'Nothing for sale yet' : `${real.length} ${real.length === 1 ? 'outfit' : 'outfits'}${brand ? ` from ${brand}` : ''}`}</p>
-          {filtered && <button type="button" className="link-btn" onClick={clear}>Clear filters</button>}
+          <p>{real.length === 0 ? (filtered ? 'No outfits match' : 'Nothing for sale yet') : `${real.length} ${real.length === 1 ? 'outfit' : 'outfits'}${brand ? ` from ${brand}` : ''}`}</p>
+          {filtered && real.length > 0 && <button type="button" className="link-btn" onClick={clear}>Clear filters</button>}
         </div>
 
         {real.length > 0 && <Grid items={real} store={store} strip />}
+
+        {real.length === 0 && filtered && (
+          <div className="empty dead-end">
+            <h2>{!hiddenBy.length ? 'Nothing like this is listed yet' : hiddenBy.some((f) => f.key !== 'query') ? 'Your filters are hiding outfits' : `Nothing matches “${query.trim()}” yet`}</h2>
+            {hiddenBy.length > 0 ? (
+              <ul className="unhide" aria-label="Filters you can take off">
+                {hiddenBy.map((f) => (
+                  <li key={f.key}>
+                    <button type="button" className="btn btn-soft" onClick={f.off}>
+                      <span>{f.key === 'query' ? 'Clear' : 'Take off'} {f.label}</span>
+                      <span className="unhide-count">{f.count} {f.count === 1 ? 'outfit' : 'outfits'}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>{timeFilter || arrive
+                ? `Nothing is sure to arrive ${timeFilter ? `before ${timeFilter.name}` : 'that soon'} yet. Some sellers haven’t said how fast they ship, so it’s worth messaging them to ask.`
+                : 'New outfits are listed every week.'}</p>
+            )}
+            {wanted ? (
+              alreadyWatching ? (
+                <p className="success" role="status">New {wanted} outfits will show in <a className="inline-link" href="#/alerts">Matches</a></p>
+              ) : (
+                <button type="button" className={hiddenBy.length ? 'btn btn-soft' : 'btn'} onClick={() => { if (addFavoriteBrand(wanted)) setWatching(wanted) }}>Tell me when new {wanted} is listed</button>
+              )
+            ) : (
+              <a className={hiddenBy.length ? 'btn btn-soft' : 'btn'} href={profile.sizes.length ? '#/alerts' : '#/you/style'}>Tell me when my size is listed</a>
+            )}
+            {(hiddenBy.length === 0 || [query.trim(), brand, category, size, arrive].filter(Boolean).length > 1) && (
+              <button type="button" className="link-btn" onClick={clear}>Clear all filters</button>
+            )}
+          </div>
+        )}
 
         {samples.length > 0 && (
           <section className="samples" aria-labelledby="samples-h">
             <div className="samples-head">
               <h2 id="samples-h">Real outfits land here first</h2>
               <p>Until then, these examples show how a listing looks. None of them are for sale.</p>
-              <a className="btn btn-soft" href="#/alerts">Tell me when my size is listed</a>
+              {!filtered && <a className="btn btn-soft" href="#/alerts">Tell me when my size is listed</a>}
             </div>
             <Grid items={samples} store={store} strip={real.length === 0} />
           </section>
         )}
 
-        {results.length === 0 && (
+        {results.length === 0 && !filtered && (
           <div className="empty">
-            <h2>Nothing matches yet</h2>
-            <p>{timeFilter || arrive
-              ? `Nothing is sure to arrive ${timeFilter ? `before ${timeFilter.name}` : 'that soon'} yet. Some sellers haven’t said how fast they ship, so it’s worth messaging them to ask.`
-              : 'Try a different brand or size, or clear your filters to see everything.'}</p>
-            <button type="button" className="btn" onClick={clear}>Show all outfits</button>
+            <h2>Nothing for sale yet</h2>
+            <p>New outfits are listed every week.</p>
+            <a className="btn" href={profile.sizes.length ? '#/alerts' : '#/you/style'}>Tell me when my size is listed</a>
           </div>
         )}
 
