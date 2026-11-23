@@ -144,3 +144,46 @@ test('festival counts are totals only, from each person’s own list, and never 
   assert.equal(Object.keys(many.body.counts).length, 100)
   await other.call('PUT', 'going', { ids: [] })
 })
+
+test('push alerts: a device can turn them on and off, and a message pings the person it is to', async () => {
+  const { setPushSender } = await import('./push.mjs')
+  const sent = []
+  setPushSender(async (sub, payload) => { sent.push({ sub, payload }); return sub.endpoint.endsWith('/gone') ? 'gone' : 'sent' })
+  const key = await (await fetch(`${app.base}/api/push/key`)).json()
+  assert.ok(key.key.length > 40)
+  const sub = { endpoint: 'https://push.example.com/abc', keys: { p256dh: 'p'.repeat(87), auth: 'a'.repeat(22) } }
+  assert.equal((await shopper.call('PUT', 'push', { subscription: { endpoint: 'http://not-https', keys: sub.keys } })).status, 400)
+  assert.equal((await shopper.call('PUT', 'push', { subscription: sub })).status, 200)
+  await other.call('POST', 'messages', { to: await shopper.id(), text: 'Is the set still available?' })
+  await new Promise((r) => setTimeout(r, 50))
+  assert.equal(sent.length, 1)
+  assert.equal(sent[0].payload.title, 'Other')
+  assert.equal(sent[0].payload.url, `#/chats/${await other.id()}`)
+  // a second message straight after is the same alert, not another ping
+  await other.call('POST', 'messages', { to: await shopper.id(), text: 'Hello?' })
+  await new Promise((r) => setTimeout(r, 50))
+  assert.equal(sent.length, 1)
+  assert.equal((await shopper.call('DELETE', 'push', { endpoint: sub.endpoint })).status, 200)
+  setPushSender(async () => 'sent')
+})
+
+test('push alerts: festival countdowns go a week and a day before, once each, using the person’s own names', async () => {
+  const { setPushSender } = await import('./push.mjs')
+  const { sendCountdowns } = await import('./api.mjs')
+  const sent = []
+  setPushSender(async (sub, payload) => { sent.push(payload); return 'sent' })
+  const sub = { endpoint: 'https://push.example.com/countdown', keys: { p256dh: 'p'.repeat(87), auth: 'a'.repeat(22) } }
+  await other.call('PUT', 'push', { subscription: sub })
+  await other.call('PUT', 'going', { ids: ['tahoe-live-2026-12-11', 'electric-forest-2027-06'], names: { 'tahoe-live-2026-12-11': 'Tahoe Live' } })
+  const noonPacific = (d) => new Date(`${d}T20:00:00Z`) // 12:00 in Los Angeles in winter
+  assert.equal(await sendCountdowns(noonPacific('2026-12-03')), 0)
+  assert.equal(await sendCountdowns(noonPacific('2026-12-04')), 1)
+  assert.equal(sent[0].title, 'Tahoe Live is a week away')
+  assert.equal(await sendCountdowns(noonPacific('2026-12-04')), 0) // once only
+  assert.equal(await sendCountdowns(new Date('2026-12-10T08:00:00Z')), 0) // midnight in LA: waits for daytime
+  assert.equal(await sendCountdowns(noonPacific('2026-12-10')), 1)
+  assert.equal(sent[1].title, 'Tahoe Live is tomorrow')
+  await other.call('PUT', 'going', { ids: [] })
+  await other.call('DELETE', 'push', { endpoint: sub.endpoint })
+  setPushSender(async () => 'sent')
+})

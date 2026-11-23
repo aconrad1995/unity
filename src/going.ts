@@ -46,7 +46,7 @@ async function share(list: GoingEvent[]) {
     const res = await fetch('/api/going', {
       method: 'PUT',
       headers: { 'x-unity-key': deviceKey(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: upcoming(list).map((x) => x.id) }),
+      body: JSON.stringify({ ids: upcoming(list).map((x) => x.id), names: Object.fromEntries(upcoming(list).map((x) => [x.id, x.name])) }),
     })
     if (res.ok) setCounts((await res.json()).counts)
   } catch {

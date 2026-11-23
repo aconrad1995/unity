@@ -15,12 +15,13 @@ import { createHash, randomUUID, timingSafeEqual } from 'node:crypto'
 import { closeSync, copyFileSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { edmtrainEvents } from './edmtrain.mjs'
+import { checkSubscription, daysBetween, pacificNow, sendPush, setupPush } from './push.mjs'
 
 const DIR = resolve(process.env.UNITY_DATA_DIR || join(process.cwd(), '.data'))
 const FILE = join(DIR, 'unity.json')
 const PHOTOS = join(DIR, 'photos')
 const MAX_BODY = 4_000_000
-const EMPTY = { rev: 1, listings: [], people: {}, messages: [], blocks: {}, reports: [], roles: {}, looks: [], fit: null, goingBy: {} }
+const EMPTY = { rev: 1, listings: [], people: {}, messages: [], blocks: {}, reports: [], roles: {}, looks: [], fit: null, goingBy: {}, goingNames: {}, push: {}, pushSent: {} }
 
 // Must match src/data.ts
 const CATEGORIES = ['Sets', 'Tops', 'Bottoms', 'Bodysuits', 'Bikini', 'Accessories']
@@ -160,6 +161,9 @@ function upgrade(d) {
   }
   d.roleCodes ??= {}
   d.goingBy ??= {}
+  d.goingNames ??= {}
+  d.push ??= {}
+  d.pushSent ??= {}
   d.authFails ??= []
   if (moved) {
     db = d
@@ -406,6 +410,68 @@ function goingCounts() {
   return value
 }
 
+/* ---------- Push alerts ---------- */
+const MAX_DEVICES = 5
+/** Sends an alert to every device this person turned alerts on for. Drops devices that have gone. */
+async function notify(person, payload) {
+  const subs = db.push[person] ?? []
+  if (!subs.length) return
+  const results = await Promise.all(subs.map((sub) => sendPush(sub, payload)))
+  const kept = subs.filter((_, i) => results[i] !== 'gone')
+  if (kept.length !== subs.length) {
+    if (kept.length) db.push[person] = kept
+    else delete db.push[person]
+    try {
+      save()
+    } catch {
+      /* tried again next time */
+    }
+  }
+}
+
+/** A week before and the day before each festival someone marked, once, during the day in Pacific time. */
+export async function sendCountdowns(now = new Date()) {
+  load()
+  const { date: today, hour } = pacificNow(now)
+  if (hour < 10 || hour >= 20) return 0
+  let sent = 0
+  let changed = false
+  for (const [person, ids] of Object.entries(db.goingBy)) {
+    if (!db.push[person]) continue
+    for (const id of ids) {
+      const start = /-(\d{4}-\d{2}-\d{2})$/.exec(id)?.[1]
+      if (!start) continue // dates not announced yet
+      const left = daysBetween(today, start)
+      if (left !== 7 && left !== 1) continue
+      const mark = `${person}|${id}|${left}`
+      if (db.pushSent[mark]) continue
+      db.pushSent[mark] = Date.now()
+      changed = true
+      const name = db.goingNames[person]?.[id] || 'Your festival'
+      await notify(person, {
+        title: left === 1 ? `${name} is tomorrow` : `${name} is a week away`,
+        body: left === 1 ? 'Outfit sorted? Check your list and charge your phone.' : 'Still need a look? See what’s on Unity that arrives in time.',
+        url: left === 1 ? '#/events' : '#/',
+        tag: `countdown-${id}`,
+      })
+      sent++
+    }
+  }
+  if (changed) {
+    const old = Date.now() - 60 * 86_400_000
+    for (const [k, t] of Object.entries(db.pushSent)) if (t < old) delete db.pushSent[k]
+    try {
+      save()
+    } catch {
+      /* the marks are kept in memory until the next save */
+    }
+  }
+  return sent
+}
+if (process.env.NODE_ENV !== 'test' && !process.env.UNITY_NO_TIMERS) {
+  setInterval(() => sendCountdowns().catch((e) => console.error('countdown alerts failed', e)), 30 * MINUTE).unref()
+}
+
 export async function api(req, res, next) {
   const url = new URL(req.url ?? '/', 'http://x')
   if (!url.pathname.startsWith('/api/')) return next()
@@ -426,6 +492,9 @@ export async function api(req, res, next) {
     if (req.method === 'GET' && path === 'events') {
       return send(res, 200, { events: await edmtrainEvents() })
     }
+
+    // The public half of the key that signs push alerts. Browsers need it to subscribe.
+    if (req.method === 'GET' && path === 'push/key') return send(res, 200, { key: setupPush(DIR).publicKey })
 
     // How many people marked each festival. Only totals leave the server.
     if (req.method === 'GET' && path === 'going') return send(res, 200, { counts: goingCounts() })
@@ -481,14 +550,42 @@ export async function api(req, res, next) {
       return send(res, 200, snapshot(me))
     }
 
+    // Turn alerts on for this device, or off.
+    if (path === 'push' && (req.method === 'PUT' || req.method === 'DELETE')) {
+      if (!allow(`push:${me}`, 20, HOUR)) throw new Refuse(429, 'rate_limited')
+      const b = await readBody(req)
+      const mine = db.push[me] ?? []
+      if (req.method === 'DELETE') {
+        const left = mine.filter((x) => x.endpoint !== b.endpoint)
+        if (left.length !== mine.length) {
+          if (left.length) db.push[me] = left
+          else delete db.push[me]
+          save()
+        }
+        return send(res, 200, { on: false })
+      }
+      const sub = checkSubscription(b.subscription)
+      if (!sub) throw new Refuse(400, 'bad_subscription')
+      setupPush(DIR)
+      db.push[me] = [...mine.filter((x) => x.endpoint !== sub.endpoint), sub].slice(-MAX_DEVICES)
+      save()
+      return send(res, 200, { on: true })
+    }
+
     // The whole list of festivals this person marked, replacing what was there.
     if (req.method === 'PUT' && path === 'going') {
       if (!allow(`going:${me}`, 60, MINUTE)) throw new Refuse(429, 'rate_limited')
       const b = await readBody(req)
       const ids = Array.isArray(b.ids) ? [...new Set(b.ids.filter((x) => typeof x === 'string' && EVENT_ID.test(x)))].slice(0, MAX_GOING) : []
-      if ((db.goingBy[me] ?? []).join('|') !== ids.join('|')) {
+      // Festival names, only for this person's own countdown alerts. Never shown to anyone else.
+      const names = {}
+      if (b.names && typeof b.names === 'object') for (const id of ids) if (typeof b.names[id] === 'string') names[id] = text(b.names[id], 60)
+      const sameNames = JSON.stringify(db.goingNames[me] ?? {}) === JSON.stringify(names)
+      if ((db.goingBy[me] ?? []).join('|') !== ids.join('|') || !sameNames) {
         if (ids.length) db.goingBy[me] = ids
         else delete db.goingBy[me]
+        if (Object.keys(names).length) db.goingNames[me] = names
+        else delete db.goingNames[me]
         save()
       }
       return send(res, 200, { counts: goingCounts() })
@@ -583,6 +680,11 @@ export async function api(req, res, next) {
         db.messages = db.messages.filter((m) => !gone.has(m.id))
       }
       save()
+      // A ping for the person it's to, unless they blocked the sender. One per chat every two minutes, so a burst is one alert.
+      if (!hasBlocked(to, me) && db.push[to] && allow(`ping:${me}:${to}`, 1, 2 * MINUTE)) {
+        const who = db.people[me]?.name?.trim() || 'Someone new'
+        void notify(to, { title: who, body: about ? `About ${about.title}: ${body.slice(0, 120)}` : body.slice(0, 140), url: `#/chats/${me}`, tag: `chat-${me}` })
+      }
       return send(res, 200, snapshot(me))
     }
 
