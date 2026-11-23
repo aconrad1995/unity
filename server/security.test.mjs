@@ -114,3 +114,16 @@ test('a listing keeps the festival it was worn at, trimmed, and leaves it off wh
   await mary.call('DELETE', `listings/${worn.body.id}`)
   await mary.call('DELETE', `listings/${plain.body.id}`)
 })
+
+test('a listing keeps how fast it ships, only 1, 3 or 7 days, and the seller can change it', async () => {
+  const made = await mary.call('POST', 'listings', listing({ shipDays: 3 }))
+  const find = (r) => r.body.listings.find((l) => l.id === made.body.id)
+  assert.equal(find(made).shipDays, 3)
+  assert.equal(find(await mary.call('PATCH', `listings/${made.body.id}`, { shipDays: 1 })).shipDays, 1)
+  assert.equal(find(await mary.call('PATCH', `listings/${made.body.id}`, { shipDays: 40 })).shipDays, 1)
+  assert.equal('shipDays' in find(await mary.call('PATCH', `listings/${made.body.id}`, { shipDays: null })), false)
+  const odd = await mary.call('POST', 'listings', listing({ shipDays: 2 }))
+  assert.equal('shipDays' in odd.body.listings.find((l) => l.id === odd.body.id), false)
+  await mary.call('DELETE', `listings/${made.body.id}`)
+  await mary.call('DELETE', `listings/${odd.body.id}`)
+})

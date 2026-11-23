@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { CameraIcon, CheckIcon, CloseIcon, PlusIcon } from '../art'
-import { APP_NAME, BRANDS, cleanBrand, CATEGORIES, CONDITIONS, SIZES, type Category, type ConditionId, type Listing, type Size } from '../data'
+import { APP_NAME, BRANDS, cleanBrand, CATEGORIES, CONDITIONS, SHIP_OPTIONS, SIZES, type Category, type ShipDays, type ConditionId, type Listing, type Size } from '../data'
 import { answerBackFrom, useGoing, wornLabel } from '../going'
 import { lastDay } from '../events'
 import { shrinkPhoto, type Store } from '../store'
@@ -9,8 +9,8 @@ import { PageHeader } from './PageHeader'
 const MAX_PHOTOS = 5
 // A half-finished outfit is kept while you look around the app, so tapping away never loses it.
 const DRAFT_KEY = 'unity.sellDraft.v1'
-type Draft = { photos: string[]; title: string; brand: string; category: Category | ''; size: Size | ''; condition: ConditionId | ''; price: string; description: string; wornAt: string }
-const BLANK: Draft = { photos: [], title: '', brand: '', category: '', size: '', condition: '', price: '', description: '', wornAt: '' }
+type Draft = { photos: string[]; title: string; brand: string; category: Category | ''; size: Size | ''; condition: ConditionId | ''; price: string; description: string; wornAt: string; shipDays: ShipDays | 0 }
+const BLANK: Draft = { photos: [], title: '', brand: '', category: '', size: '', condition: '', price: '', description: '', wornAt: '', shipDays: 0 }
 function readDraft(): Draft {
   try {
     return { ...BLANK, ...JSON.parse(sessionStorage.getItem(DRAFT_KEY) ?? '{}') }
@@ -37,20 +37,21 @@ export default function Sell({ store, wornFrom }: { store: Store; wornFrom?: str
   const [condition, setCondition] = useState<ConditionId | ''>(draft.condition)
   const [price, setPrice] = useState(draft.price)
   const [description, setDescription] = useState(draft.description)
+  const [shipDays, setShipDays] = useState<ShipDays | 0>(draft.shipDays)
   const [sending, setSending] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   /** Clears a field's error as soon as it is fixed. */
   const fixed = (key: string) => setErrors((e) => (e[key] || e.form ? { ...e, [key]: '', form: '' } : e))
 
   useEffect(() => {
-    const d: Draft = { photos, title, brand, category, size, condition, price, description, wornAt }
+    const d: Draft = { photos, title, brand, category, size, condition, price, description, wornAt, shipDays }
     try {
       if (JSON.stringify(d) === JSON.stringify(BLANK)) sessionStorage.removeItem(DRAFT_KEY)
       else sessionStorage.setItem(DRAFT_KEY, JSON.stringify(d))
     } catch {
       try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, photos: [] })) } catch { /* the draft is a nicety */ }
     }
-  }, [photos, title, brand, category, size, condition, price, description, wornAt])
+  }, [photos, title, brand, category, size, condition, price, description, wornAt, shipDays])
 
   async function onPhotos(files: FileList | null) {
     if (!files || files.length === 0) return
@@ -87,8 +88,9 @@ export default function Sell({ store, wornFrom }: { store: Store; wornFrom?: str
     if (!condition) next.condition = 'Choose how worn it is.'
     if (!price || !Number.isFinite(amount) || amount < 1) next.price = 'Enter a price of $1 or more.'
     else if (amount > 10000) next.price = 'The most an outfit can be listed for is $10,000.'
+    if (!shipDays) next.ship = 'Pick how fast you can send it.'
     setErrors(next)
-    if (Object.keys(next).length > 0 || !category || !size || !condition) {
+    if (Object.keys(next).length > 0 || !category || !size || !condition || !shipDays) {
       setTimeout(() => document.querySelector('[data-error="true"]')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 50)
       return
     }
@@ -102,6 +104,7 @@ export default function Sell({ store, wornFrom }: { store: Store; wornFrom?: str
       condition,
       price: Math.round(amount),
       description: description.trim() || 'No description added.',
+      shipDays,
       ...(wornAt.trim() ? { wornAt: wornAt.trim().slice(0, 60) } : {}),
       seller: 'You',
       sample: false,
@@ -238,7 +241,7 @@ export default function Sell({ store, wornFrom }: { store: Store; wornFrom?: str
           </fieldset>
 
           <fieldset className="step">
-            <legend><span className="step-n">4</span> Set your price</legend>
+            <legend><span className="step-n">4</span> Price and shipping</legend>
             <label className="field price-field">
               <span>Price in dollars</span>
               <span className="price-input">
@@ -248,6 +251,16 @@ export default function Sell({ store, wornFrom }: { store: Store; wornFrom?: str
             </label>
             <span className="hint">Whole dollars work best. Cents are rounded, so $45.50 lists as $46.</span>
             {err('price')}
+            <div className="field" role="group" aria-labelledby="ship-l">
+              <span id="ship-l">How fast can you send it?</span>
+              <span className="hint">Buyers heading to a festival filter by what arrives in time.</span>
+              <div className="bubbles bubbles-wrap">
+                {SHIP_OPTIONS.map((o) => (
+                  <button key={o.days} type="button" className="bubble" aria-pressed={shipDays === o.days} onClick={() => { setShipDays(o.days); fixed('ship') }}>{o.label}</button>
+                ))}
+              </div>
+            </div>
+            {err('ship')}
           </fieldset>
 
           {err('form')}

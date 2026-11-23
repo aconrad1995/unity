@@ -58,6 +58,34 @@ export interface Listing {
   soldAt?: number
   /** The festival it was worn at, like "Tahoe Live 2026". Optional. */
   wornAt?: string
+  /** How many days the seller needs to send it: 1, 3 or 7. Older listings may not say. */
+  shipDays?: ShipDays
+}
+
+export type ShipDays = 1 | 3 | 7
+export const SHIP_OPTIONS: { days: ShipDays; label: string }[] = [
+  { days: 1, label: 'Next day' },
+  { days: 3, label: 'Within 3 days' },
+  { days: 7, label: 'Within a week' },
+]
+/** Standard shipping inside the US, on the slow side so "in time" means in time. */
+export const TRANSIT_DAYS = 5
+
+/** When it should reach a buyer who orders today: the seller's days to send, plus the trip. */
+export function arrivesBy(l: Pick<Listing, 'shipDays'>, from = new Date()): Date | null {
+  if (!l.shipDays) return null
+  const d = new Date(from)
+  d.setHours(12, 0, 0, 0)
+  d.setDate(d.getDate() + l.shipDays + TRANSIT_DAYS)
+  return d
+}
+/** True when it should arrive at least a day before the festival starts (YYYY-MM-DD). */
+export function arrivesBefore(l: Pick<Listing, 'shipDays'>, date: string, from = new Date()): boolean {
+  const by = arrivesBy(l, from)
+  if (!by) return false
+  const start = new Date(`${date}T12:00:00`)
+  start.setDate(start.getDate() - 1)
+  return by.getTime() <= start.getTime()
 }
 
 export const conditionLabel = (id: ConditionId) => CONDITIONS.find((c) => c.id === id)!.label
@@ -80,7 +108,7 @@ const s = (
   description: string, seller: string, bg: string, fill: string, accent: string,
 ): Listing => ({
   id: `sample-${++n}`, title, brand, category, size, condition, price, description, seller,
-  sample: true, createdAt: 1000 - n, art: { kind: ART_FOR_CATEGORY[category], bg, fill, accent },
+  sample: true, createdAt: 1000 - n, shipDays: ([1, 3, 7] as const)[n % 3], art: { kind: ART_FOR_CATEGORY[category], bg, fill, accent },
 })
 
 // Sample listings so the shop has something to browse. None of these are real items or real sellers.

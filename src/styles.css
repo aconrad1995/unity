@@ -605,6 +605,16 @@ thead th { font-size: 0.8125rem; color: var(--ink-soft); border-bottom: 2px soli
 .back-from .countdown-main > p:not(.event-kicker) { margin-bottom: 4px; }
 .back-from .event-actions { margin-top: 8px; }
 .card-worn { font-size: 0.8125rem; font-weight: 600; color: var(--accent-text); margin-top: 2px; }
+.ship-card { display: grid; gap: 6px; padding: 12px 16px; border: var(--hair); border-radius: var(--r-card); background: var(--cloud); }
+.ship-ok, .ship-late { font-weight: 700; font-size: 0.9375rem; }
+.ship-ok { color: #0d6b4a; }
+.ship-late { color: var(--danger); }
+.in-time { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 12px; align-items: center; width: 100%; margin-top: 16px; padding: 12px 16px; text-align: left; background: var(--cloud); border: var(--line); border-radius: var(--r-card); }
+.in-time > span:last-child { display: grid; gap: 2px; }
+.in-time > span:last-child > span { color: var(--ink-soft); font-size: 0.875rem; }
+.in-time-box { width: 24px; height: 24px; border: 2px solid var(--ink); border-radius: 6px; background: var(--cloud); }
+.in-time[aria-pressed='true'] { background: var(--pink-soft); }
+.in-time[aria-pressed='true'] .in-time-box { background: var(--pink-hot) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2317121c' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E") center / 16px no-repeat; }
 .sell-from { margin-bottom: 12px; padding: 12px 16px; border: var(--line); border-radius: var(--r-card); background: var(--pink-soft); }
 .countdown-empty { display: grid; gap: 8px; justify-items: start; padding: 16px; background: var(--cloud); border: 1.5px dashed var(--ink); border-radius: var(--r-card); }
 .countdown-empty p { color: var(--ink-soft); }
