@@ -9,6 +9,16 @@ import { PageHeader } from './PageHeader'
 const MAX_PHOTOS = 5
 // A half-finished outfit is kept while you look around the app, so tapping away never loses it.
 const DRAFT_KEY = 'unity.sellDraft.v1'
+// Sellers ship everything the same way, so the speed from their last listing is picked for the next.
+const SHIP_KEY = 'unity.lastShipDays'
+function lastShipDays(): ShipDays | 0 {
+  try {
+    const n = Number(localStorage.getItem(SHIP_KEY))
+    return SHIP_OPTIONS.find((o) => o.days === n)?.days ?? 0
+  } catch {
+    return 0
+  }
+}
 type Draft = { photos: string[]; title: string; brand: string; category: Category | ''; size: Size | ''; condition: ConditionId | ''; price: string; description: string; wornAt: string; shipDays: ShipDays | 0 }
 const BLANK: Draft = { photos: [], title: '', brand: '', category: '', size: '', condition: '', price: '', description: '', wornAt: '', shipDays: 0 }
 function readDraft(): Draft {
@@ -37,7 +47,7 @@ export default function Sell({ store, wornFrom }: { store: Store; wornFrom?: str
   const [condition, setCondition] = useState<ConditionId | ''>(draft.condition)
   const [price, setPrice] = useState(draft.price)
   const [description, setDescription] = useState(draft.description)
-  const [shipDays, setShipDays] = useState<ShipDays | 0>(draft.shipDays)
+  const [shipDays, setShipDays] = useState<ShipDays | 0>(() => draft.shipDays || lastShipDays())
   const [sending, setSending] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   /** Clears a field's error as soon as it is fixed. */
@@ -46,7 +56,7 @@ export default function Sell({ store, wornFrom }: { store: Store; wornFrom?: str
   useEffect(() => {
     const d: Draft = { photos, title, brand, category, size, condition, price, description, wornAt, shipDays }
     try {
-      if (JSON.stringify(d) === JSON.stringify(BLANK)) sessionStorage.removeItem(DRAFT_KEY)
+      if (JSON.stringify({ ...d, shipDays: 0 }) === JSON.stringify(BLANK)) sessionStorage.removeItem(DRAFT_KEY)
       else sessionStorage.setItem(DRAFT_KEY, JSON.stringify(d))
     } catch {
       try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, photos: [] })) } catch { /* the draft is a nicety */ }
@@ -126,6 +136,7 @@ export default function Sell({ store, wornFrom }: { store: Store; wornFrom?: str
     }
     if (wornFrom) answerBackFrom(wornFrom)
     try { sessionStorage.removeItem(DRAFT_KEY) } catch { /* nothing to clear */ }
+    try { localStorage.setItem(SHIP_KEY, String(shipDays)) } catch { /* only saves a tap next time */ }
     try { sessionStorage.setItem('unity.justListed', newId) } catch { /* banner is optional */ }
     window.location.hash = `#/item/${newId}`
   }
