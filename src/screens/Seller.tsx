@@ -16,6 +16,18 @@ export function Stars({ value, label }: { value: number; label?: string }) {
   )
 }
 
+/** "Selling since Nov 2026 · 3 for sale · 1 sold": a quick sense of who you're buying from. */
+export function SellerHistory({ store, id }: { store: Store; id: string }) {
+  const facts = store.sellers[id]
+  const forSale = store.listings.filter((l) => l.ownerId === id && l.status !== 'sold').length
+  const parts = [
+    facts?.since ? `Selling since ${new Date(facts.since).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}` : '',
+    forSale ? `${forSale} for sale` : '',
+    facts?.sold ? `${facts.sold} sold` : '',
+  ].filter(Boolean)
+  return parts.length ? <span className="seller-history">{parts.join(' · ')}</span> : null
+}
+
 /** "4.8 · 12 ratings", or "No ratings yet". */
 export function RatingLine({ summary }: { summary: RatingSummary | undefined }) {
   if (!summary?.count) return <span className="rating-line rating-none">No ratings yet</span>

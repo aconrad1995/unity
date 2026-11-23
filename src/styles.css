@@ -380,6 +380,7 @@ select:focus-visible, .field input:focus-visible, .field textarea:focus-visible 
 .seller-card { display: flex; align-items: center; gap: 12px; background: var(--cloud); border-radius: var(--r-card); padding: 12px 16px; }
 .seller-card strong { display: block; }
 .seller-upfor { display: block; color: var(--ink-soft); font-size: 0.9375rem; }
+.seller-history { display: block; color: var(--ink-soft); font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
 .tab-count { z-index: 1; position: absolute; top: 4px; left: calc(50% + 6px); min-width: 20px; height: 20px; padding: 0 5px; display: grid; place-items: center; border-radius: var(--r-pill); background: var(--pink-hot); color: var(--ink); font-size: 0.75rem; font-weight: 600; }
 
 
@@ -432,7 +433,12 @@ select:focus-visible, .field input:focus-visible, .field textarea:focus-visible 
 .counter { text-align: right; }
 .blocked-note { display: grid; gap: 12px; justify-items: start; }
 .safety { background: var(--cloud); border-radius: var(--r-card); padding: 4px 16px; }
-.safety summary { cursor: pointer; font-weight: 600; color: var(--blue-ink); padding: 12px 0; }
+.safety summary { cursor: pointer; font-weight: 600; color: var(--blue-ink); padding: 12px 0; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 44px; }
+.safety summary::-webkit-details-marker { display: none; }
+/* A drawn chevron in place of the browser's triangle; it turns when the section opens. */
+.safety summary::after { content: ''; flex: none; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translate(-2px, -2px); transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1); }
+.safety[open] summary::after { transform: rotate(-135deg) translate(-2px, -2px); }
+@media (prefers-reduced-motion: reduce) { .safety summary::after { transition: none; } }
 .safety[open] { padding-bottom: 16px; display: grid; gap: 12px; }
 .safety[open] > * + * { margin-top: 12px; }
 .safety-tips { list-style: disc; padding-left: 20px; display: grid; gap: 4px; }
@@ -682,7 +688,12 @@ thead th { font-size: 0.8125rem; color: var(--ink-soft); border-bottom: 2px soli
 .samples-head .btn { flex: none; margin-top: 4px; }
 .page > .inspo-strip { margin: 16px 0; }
 .buy-how { font-size: 0.875rem; color: var(--ink-soft); text-wrap: pretty; }
-.buy-how-chat { background: var(--cloud); border: var(--hair); border-radius: var(--r-card); padding: 12px 16px; }
+/* The outfit being discussed and the three steps of a safe deal, kept together at the top of a chat. */
+.thread-deal { display: grid; background: var(--cloud); border-radius: var(--r-card); overflow: hidden; }
+.thread-deal .thread-about { background: none; border-radius: 0; }
+.deal-steps { list-style: none; counter-reset: step; display: grid; gap: 6px; margin: 0; padding: 12px 16px 14px; border-top: 1px dashed var(--ink-soft); font-size: 0.9375rem; line-height: 1.35; }
+.deal-steps li { counter-increment: step; display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; align-items: baseline; }
+.deal-steps li::before { content: counter(step); display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--pink-soft); color: var(--ink); font-weight: 700; font-size: 0.8125rem; font-variant-numeric: tabular-nums; transform: translateY(-1px); }
 .sample-cta { display: grid; gap: 12px; background: var(--cloud); border: var(--hair); border-radius: var(--r-card); padding: 16px; }
 .sample-cta p { text-wrap: pretty; }
 
@@ -714,6 +725,17 @@ thead th { font-size: 0.8125rem; color: var(--ink-soft); border-bottom: 2px soli
 .buy-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
 .buy-row .btn { padding: 0 16px; text-align: center; line-height: 1.2; }
 .buy-row .save-big { height: auto; min-height: 48px; padding: 0 16px; }
+/* The buying row is a tag that stays in reach above the tab bar until it reaches its own place. */
+.buy-bar {
+  position: sticky; z-index: 20; bottom: calc(var(--tab-h) + env(safe-area-inset-bottom) + 8px);
+  grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px;
+  padding: 8px; background: var(--cloud); border: var(--line); border-radius: var(--r-card);
+}
+/* Sticky is held inside its parent's box, so the wrapper steps aside and the bar can travel the whole page. */
+.actions:has(> .buy-bar) { display: contents; }
+.buy-bar-price { padding: 0 8px; font-weight: 800; font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+.buy-bar .save-big { width: 48px; padding: 0; justify-content: center; }
+.buy-bar .save-big span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* The Inspo doorway as a full-width row inside the grid; dense packing fills the row above it. */
 .grid-dense { grid-auto-flow: row dense; }

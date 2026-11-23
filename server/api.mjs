@@ -365,6 +365,7 @@ function snapshot(me) {
     looks: db.looks.map(({ photos, ...l }) => ({ ...l, photoCount: photos.length })),
     fit: db.fit,
     ratings: publicRatings(),
+    sellers: sellerFacts(),
     account: db.accountOf[me] ?? null,
     // Whether "Forgot your password?" can email a link, or has to go through the team.
     mailOn: mailReady(),
@@ -385,6 +386,18 @@ function publicRatings() {
       average: Math.round((list.reduce((n, r) => n + r.stars, 0) / list.length) * 10) / 10,
       recent: list.slice(0, MAX_NOTES_SHOWN),
     }
+  }
+  return out
+}
+/** For each seller: when they first listed, and how many outfits they've marked sold. Shown on listings
+    and in chats so buyers can tell a regular from someone brand new. */
+function sellerFacts() {
+  const out = {}
+  for (const l of db.listings) {
+    if (!l.ownerId) continue
+    const s = (out[l.ownerId] ??= { since: l.createdAt ?? 0, sold: 0 })
+    if (l.createdAt && (!s.since || l.createdAt < s.since)) s.since = l.createdAt
+    if (l.status === 'sold') s.sold++
   }
   return out
 }
