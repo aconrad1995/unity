@@ -1,5 +1,6 @@
 import { CalendarIcon, ChatIcon, PlusIcon, ProfileIcon, ShopIcon } from './art'
 import { useRoute, useStore } from './store'
+import { APP_NAME } from './data'
 import Shop from './screens/Shop'
 import ListingPage from './screens/ListingPage'
 import Sell from './screens/Sell'
@@ -18,7 +19,7 @@ export default function App() {
   const store = useStore()
   const alerts = useAlerts(store)
   const [page, id, extra] = useRoute()
-  const tab = page === 'sell' ? 'sell' : page === 'chats' ? 'chats' : page === 'events' ? 'events' : page === 'you' || page === 'team' ? 'you' : 'shop'
+  const tab = page === 'sell' ? 'sell' : page === 'chats' ? 'chats' : page === 'events' ? 'events' : page === 'you' || page === 'team' || page === 'inspo' || page === 'look' ? 'you' : 'shop'
   // Inside a chat the bottom bar steps aside so it never covers the message box.
   const inThread = page === 'chats' && !!id
 
@@ -41,6 +42,9 @@ export default function App() {
 
   return (
     <div className="app">
+      {store.online === false && (
+        <p className="offline" role="status">Can’t reach {APP_NAME}. Check your connection. Messages send once you’re back.</p>
+      )}
       {screen}
       {!inThread && <nav className="tabbar" aria-label="Main">
         <a href="#/" className="tab" aria-current={tab === 'shop' ? 'page' : undefined}>

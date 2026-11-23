@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { BellIcon, CameraIcon, HeartIcon, SearchIcon } from '../art'
 import type { Alerts } from '../alerts'
 import { APP_NAME, CATEGORIES, FEATURED, SIZES, arrivesBefore, arrivesBy, conditionLabel, featuredFor, type Listing } from '../data'
@@ -105,7 +105,7 @@ export default function Shop({ store, alerts, initialBrand = '', forEvent }: { s
               </a>
               <a href="#/saved" className="saved-link">
                 <HeartIcon filled={store.saved.length > 0} />
-                <span>Saved{store.saved.length > 0 ? ` (${store.saved.length})` : ''}</span>
+                <span className="saved-label">Saved{store.saved.length > 0 ? ` (${store.saved.length})` : ''}</span>
               </a>
             </span>
           </div>
@@ -167,7 +167,7 @@ export default function Shop({ store, alerts, initialBrand = '', forEvent }: { s
           <label className={`chip-select${arrive ? ' is-set' : ''}`}>
             <span className="sr-only">Arrives</span>
             <select value={arrive} onChange={(e) => setArrive(e.target.value as typeof arrive)}>
-              <option value="">Arrives any time</option>
+              <option value="">Any arrival</option>
               {nextFest && <option value="fest">Before {nextFest.name}</option>}
               <option value="week">Within a week</option>
               <option value="fortnight">Within 2 weeks</option>
@@ -176,7 +176,7 @@ export default function Shop({ store, alerts, initialBrand = '', forEvent }: { s
           <label className="chip-select">
             <span className="sr-only">Sort</span>
             <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-              <option value="you">Picked for you</option>
+              <option value="you">For you</option>
               <option value="new">Newest first</option>
               <option value="low">Price: low to high</option>
               <option value="high">Price: high to low</option>
@@ -207,9 +207,7 @@ export default function Shop({ store, alerts, initialBrand = '', forEvent }: { s
           {filtered && <button type="button" className="link-btn" onClick={clear}>Clear filters</button>}
         </div>
 
-        {real.length > 0 && <Grid items={real.slice(0, 4)} store={store} />}
-        {real.length > 0 && <InspoStrip store={store} />}
-        {real.length > 4 && <Grid items={real.slice(4)} store={store} />}
+        {real.length > 0 && <Grid items={real} store={store} strip />}
 
         {samples.length > 0 && (
           <section className="samples" aria-labelledby="samples-h">
@@ -218,9 +216,7 @@ export default function Shop({ store, alerts, initialBrand = '', forEvent }: { s
               <p>Until then, these examples show how a listing looks. None of them are for sale.</p>
               <a className="btn btn-soft" href="#/alerts">Tell me when my size is listed</a>
             </div>
-            <Grid items={samples.slice(0, 4)} store={store} />
-            {real.length === 0 && <InspoStrip store={store} />}
-            {samples.length > 4 && <Grid items={samples.slice(4)} store={store} />}
+            <Grid items={samples} store={store} strip={real.length === 0} />
           </section>
         )}
 
@@ -243,8 +239,24 @@ export default function Shop({ store, alerts, initialBrand = '', forEvent }: { s
   )
 }
 
-function Grid({ items, store }: { items: Listing[]; store: Store }) {
-  return <ul className="grid">{items.map((l) => <Card key={l.id} listing={l} store={store} />)}</ul>
+/** The outfit grid. With enough outfits the Inspo doorway sits inside it, after the first few, as a
+ *  full-width row; the grid packs later cards into any gap above it, so 2, 3 or 4 columns never leave
+ *  a lone card stranded before the strip. With only a few outfits it simply follows them. */
+function Grid({ items, store, strip = false }: { items: Listing[]; store: Store; strip?: boolean }) {
+  const inside = strip && items.length > 6
+  return (
+    <>
+      <ul className={`grid${inside ? ' grid-dense' : ''}`}>
+        {items.map((l, i) => (
+          <Fragment key={l.id}>
+            {inside && i === 4 && <li className="grid-strip"><InspoStrip store={store} /></li>}
+            <Card listing={l} store={store} />
+          </Fragment>
+        ))}
+      </ul>
+      {strip && !inside && <InspoStrip store={store} />}
+    </>
+  )
 }
 
 /** A small doorway to Inspo at the top of the shop: the fit of the week when there is one. */
