@@ -1,7 +1,7 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { CheckIcon } from '../art'
 import { APP_NAME } from '../data'
-import { applyMoveCode, moveCode, signIn, signOut, type Store } from '../store'
+import { LINK_EXPIRED, applyMoveCode, askForResetLink, moveCode, resetWithLink, signIn, signOut, type Store } from '../store'
 import { PageHeader } from './PageHeader'
 
 /** "#/you/account": make an account, sign in on this phone, change the password, or sign out. */
@@ -67,7 +67,9 @@ function SignInForm({ store }: { store: Store }) {
   const [password, setPassword] = useState('')
   const [problem, setProblem] = useState('')
   const [busy, setBusy] = useState(false)
+  const [forgot, setForgot] = useState(false)
   const leaving = store.mine.length > 0 || store.chats.length > 0
+  if (forgot) return <ForgotForm startEmail={email.trim()} back={() => setForgot(false)} />
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (leaving && !window.confirm(`This phone has listings or chats that aren’t saved to an account. Signing in switches to your account and leaves them behind. Sign in anyway?`)) return
@@ -93,8 +95,92 @@ function SignInForm({ store }: { store: Store }) {
       </label>
       {problem && <p className="error" role="alert">{problem}</p>}
       <button type="submit" className="btn" disabled={busy || !email.trim() || !password}>{busy ? 'Signing in' : 'Sign in'}</button>
-      <p className="hint">Forgot your password? Ask the {APP_NAME} team. We’ll check it’s you, then set a new one.</p>
+      {store.mailOn
+        ? <button type="button" className="link-btn" onClick={() => setForgot(true)}>Forgot your password?</button>
+        : <p className="hint">Forgot your password? Ask the {APP_NAME} team. We’ll check it’s you, then set a new one.</p>}
     </form>
+  )
+}
+
+/** Emails a one-time link for choosing a new password. */
+function ForgotForm({ startEmail, back }: { startEmail: string; back: () => void }) {
+  const [email, setEmail] = useState(startEmail)
+  const [sentTo, setSentTo] = useState('')
+  const [problem, setProblem] = useState('')
+  const [busy, setBusy] = useState(false)
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    const why = await askForResetLink(email.trim())
+    setBusy(false)
+    if (why) return setProblem(why)
+    setSentTo(email.trim())
+  }
+  if (sentTo) {
+    return (
+      <div className="step" role="status">
+        <h2 className="section-h section-h-in">Check your email</h2>
+        <p>If <strong>{sentTo}</strong> has a {APP_NAME} account, a link to choose a new password is on its way. It works once, for one hour.</p>
+        <p className="hint">Nothing after a few minutes? Check your spam folder, or make sure that’s the email you signed up with.</p>
+        <button type="button" className="btn btn-soft" onClick={back}>Back to sign in</button>
+      </div>
+    )
+  }
+  return (
+    <form className="step" onSubmit={submit}>
+      <h2 className="section-h section-h-in">Forgot your password?</h2>
+      <p>Enter the email you signed up with and we’ll send a link to choose a new one.</p>
+      <label className="field">
+        <span>Email</span>
+        <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); setProblem('') }} autoComplete="username" inputMode="email" autoCapitalize="none" spellCheck={false} maxLength={160} required />
+      </label>
+      {problem && <p className="error" role="alert">{problem}</p>}
+      <button type="submit" className="btn" disabled={busy || !email.trim()}>{busy ? 'Sending' : 'Email me a link'}</button>
+      <button type="button" className="link-btn" onClick={back}>Back to sign in</button>
+    </form>
+  )
+}
+
+/** "#/reset/<link>": the page an emailed link opens. Choose a new password and you're signed in. */
+export function ResetPage({ store, token }: { store: Store; token: string }) {
+  const [password, setPassword] = useState('')
+  const [problem, setProblem] = useState('')
+  const [busy, setBusy] = useState(false)
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (password.length < 8) return setProblem('Use a password of at least 8 characters.')
+    if (leaving && !window.confirm('This phone has listings or chats that aren’t saved to an account. Signing in to yours leaves them behind. Go ahead?')) return
+    setBusy(true)
+    const why = await resetWithLink(token, password)
+    setBusy(false)
+    if (why) return setProblem(why)
+    try { sessionStorage.setItem('unity.justReset', '1') } catch { /* the note is optional */ }
+    // Swap the address without a hashchange (so nothing renders and clears the note), then start fresh as the account.
+    window.history.replaceState(null, '', '#/you/account')
+    window.location.reload()
+  }
+  const expired = problem === LINK_EXPIRED
+  // Signing in replaces this phone's identity, so warn when it holds things no account has saved.
+  const leaving = !store.account && (store.mine.length > 0 || store.chats.length > 0)
+  return (
+    <>
+      <PageHeader title="New password" back="#/you/account/signin" backLabel="Back to sign in" />
+      <main className="page profile account">
+        <form className="step" onSubmit={submit}>
+          <h2 className="section-h section-h-in">Choose a new password</h2>
+          <p>Once it’s saved, this phone is signed in to your account.</p>
+          <label className="field">
+            <span>New password</span>
+            <span className="hint">At least 8 characters.</span>
+            <input type="password" value={password} onChange={(e) => { setPassword(e.target.value); setProblem('') }} autoComplete="new-password" minLength={8} maxLength={200} required autoFocus />
+          </label>
+          {problem && <p className="error" role="alert">{problem}</p>}
+          {expired
+            ? <a className="btn" href="#/you/account/signin">Get a new link</a>
+            : <button type="submit" className="btn" disabled={busy || !password}>{busy ? 'Saving' : 'Save and sign in'}</button>}
+        </form>
+      </main>
+    </>
   )
 }
 
@@ -104,6 +190,13 @@ function SignedIn({ store }: { store: Store }) {
   const [problem, setProblem] = useState('')
   const [done, setDone] = useState(false)
   const [busy, setBusy] = useState(false)
+  // Shown once, right after choosing a new password from an emailed link.
+  const [justReset] = useState(() => {
+    try { return sessionStorage.getItem('unity.justReset') === '1' } catch { return false }
+  })
+  useEffect(() => {
+    try { sessionStorage.removeItem('unity.justReset') } catch { /* nothing to clear */ }
+  }, [])
   async function change(e: FormEvent) {
     e.preventDefault()
     if (next.length < 8) return setProblem('Use a new password of at least 8 characters.')
@@ -118,6 +211,7 @@ function SignedIn({ store }: { store: Store }) {
       <section className="step">
         <h2 className="section-h section-h-in">Signed in</h2>
         <p className="account-email"><CheckIcon /> {store.account}</p>
+        {justReset && <p className="success" role="status"><CheckIcon /> New password saved. You’re signed in on this phone.</p>}
         <p className="hint">Sign in with this email on any phone, or in the home-screen app, to pick up where you left off.</p>
         <button type="button" className="btn btn-soft" onClick={() => {
           if (!window.confirm('Sign out on this phone? Your listings and chats stay in your account. Sign back in any time.')) return

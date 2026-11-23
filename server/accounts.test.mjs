@@ -74,6 +74,11 @@ test('guessing passwords for one email is slowed down', async () => {
   assert.equal(codes.filter((s) => s === 429).length, 2)
 })
 
+test('with no email key on the host, reset links are off and the app is told so', async () => {
+  assert.equal((await x.call('GET', 'sync')).body.mailOn, false)
+  assert.equal((await x.call('POST', 'account/forgot', { email: 'mary@example.com' })).status, 503)
+})
+
 test('only the team can reset someone’s password', async () => {
   assert.equal((await x.call('POST', 'team/account-reset', { email: 'mary@example.com', password: 'reset-by-team' })).status, 404)
   const t = app.person('t')

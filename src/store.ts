@@ -62,7 +62,7 @@ export interface Fit { lookId: string; note: string; at: number; by: string }
 export interface Report { id: string; by: string; user: string; reason: string; at: number; resolved?: number; evidence: Message[] }
 interface Shared {
   rev: number; me: string; listings: Listing[]; people: Record<string, Person>; messages: Message[]; blocked: string[]
-  roles: Record<string, Role>; myRole: Role; looks: Look[]; fit: Fit | null; ratings: Record<string, RatingSummary>; account: string | null
+  roles: Record<string, Role>; myRole: Role; looks: Look[]; fit: Fit | null; ratings: Record<string, RatingSummary>; account: string | null; mailOn?: boolean
 }
 const NOTHING: Shared = { rev: 0, me: '', listings: [], people: {}, messages: [], blocked: [], roles: {}, myRole: '', looks: [], fit: null, ratings: {}, account: null }
 
@@ -131,12 +131,29 @@ const ACCOUNT_WHY: Record<string, string> = {
   wrong_login: 'That email and password don’t match. Check them and try again.',
   rate_limited: 'Too many tries. Wait a little while, then try again.',
   no_account: 'This phone isn’t signed in.',
+  link_expired: 'This link has expired or was already used. Ask for a new one on the sign-in screen.',
+  mail_off: 'Email links aren’t switched on yet. Ask the Unity team to reset your password.',
 }
+export const LINK_EXPIRED = ACCOUNT_WHY.link_expired
 const accountWhy = (r: Reply) => (r.error && ACCOUNT_WHY[r.error]) || (r.status === 0 ? 'Unity can’t be reached. Check your connection.' : 'That didn’t work. Try again in a moment.')
 
 /** Signs this browser in to an account. Returns why it failed, or '' (then reload the page). */
 export async function signIn(email: string, password: string): Promise<string> {
   const r = await call('POST', 'account/signin', { email, password })
+  const key = (r.data as unknown as { key?: string } | null)?.key
+  if (!key) return accountWhy(r)
+  return becomeKey(key) ? '' : 'This browser can’t save the sign-in. Turn off private browsing and try again.'
+}
+
+/** Emails a reset link if the address has an account. Returns why it failed, or ''. */
+export async function askForResetLink(email: string): Promise<string> {
+  const r = await call('POST', 'account/forgot', { email })
+  return r.status === 200 ? '' : accountWhy(r)
+}
+
+/** Sets a new password from an emailed link and signs this browser in. Returns why it failed, or '' (then reload). */
+export async function resetWithLink(token: string, password: string): Promise<string> {
+  const r = await call('POST', 'account/reset', { token, password })
   const key = (r.data as unknown as { key?: string } | null)?.key
   if (!key) return accountWhy(r)
   return becomeKey(key) ? '' : 'This browser can’t save the sign-in. Turn off private browsing and try again.'
@@ -437,7 +454,7 @@ export function useStore() {
 
   return {
     listings, mine, saved, online, me: shared.me, people: shared.people, blocked: shared.blocked, chats, unread,
-    roles: shared.roles ?? {}, myRole: shared.myRole ?? '', looks: shared.looks ?? [], fit: shared.fit ?? null, ratings: shared.ratings ?? {}, account: shared.account ?? null, signUp, changePassword, resetPassword,
+    roles: shared.roles ?? {}, myRole: shared.myRole ?? '', looks: shared.looks ?? [], fit: shared.fit ?? null, ratings: shared.ratings ?? {}, account: shared.account ?? null, mailOn: shared.mailOn === true, signUp, changePassword, resetPassword,
     nameRefused: refusal === 'name', handleRefused: refusal === 'handle', rate, unrate, removeRating, canRate, addListing, editListing, removeListing, toggleSaved, sendMessage, retryMessage, discardMessage, setBlocked, report, markRead,
     addLook, removeLook, claimRole, pickFit, teamReports, resolveReport,
   }
