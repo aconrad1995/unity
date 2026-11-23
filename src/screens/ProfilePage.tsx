@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { CameraIcon, CloseIcon, Sparkle } from '../art'
+import { CameraIcon, CloseIcon, ProfileIcon } from '../art'
 import { APP_NAME, BRANDS, SIZES, UP_FOR, VIBES, cleanBrand } from '../data'
 import { applyMoveCode, moveCode, shrinkPhoto, useProfile, type Store } from '../store'
 import { readTaste, resetTaste, topOf } from '../taste'
 import { Card } from './Card'
 import { PageHeader } from './PageHeader'
+import { Appearance } from './Appearance'
 import { RoleBadge } from './Team'
 
 export function Avatar({ profile, size = 96 }: { profile: { photo: string }; size?: number }) {
@@ -12,7 +13,7 @@ export function Avatar({ profile, size = 96 }: { profile: { photo: string }; siz
     <img className="avatar" src={profile.photo} alt="" width={size} height={size} />
   ) : (
     <span className="avatar avatar-empty" style={{ width: size, height: size }} aria-hidden="true">
-      <Sparkle size={size * 0.45} />
+      <ProfileIcon />
     </span>
   )
 }
@@ -97,6 +98,8 @@ export default function ProfilePage({ store }: { store: Store }) {
           {photoProblem && <p className="error" role="alert">{photoProblem}</p>}
           {saveFailed && <p className="error" role="alert">This device is out of storage space, so your changes may not be kept. Try a smaller picture.</p>}
         </section>
+
+        <Appearance />
 
         <section aria-labelledby="closet-h">
           <h2 id="closet-h" className="section-h">My closet</h2>

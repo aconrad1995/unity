@@ -87,14 +87,6 @@ export function ListingImage({ listing, index = 0 }: { listing: Listing; index?:
   return (
     <svg className="photo" viewBox="0 0 200 240" role="img" aria-label={`Illustration of ${listing.title}`}>
       <defs>
-        <linearGradient id={g('bg')} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={mix(art.bg, '#FFFFFF', 0.55)} />
-          <stop offset="1" stopColor={art.bg} />
-        </linearGradient>
-        <radialGradient id={g('glow')} cx="0.5" cy="0.4" r="0.6">
-          <stop offset="0" stopColor="#FFFFFF" stopOpacity="0.85" />
-          <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
-        </radialGradient>
         <linearGradient id={g('cloth')} x1="0.1" y1="0" x2="0.9" y2="1">
           <stop offset="0" stopColor={light} />
           <stop offset="0.5" stopColor={art.fill} />
@@ -132,15 +124,8 @@ export function ListingImage({ listing, index = 0 }: { listing: Listing; index?:
         </pattern>
       </defs>
 
-      <rect width="200" height="240" fill={`url(#${g('bg')})`} />
-      <rect width="200" height="240" fill={`url(#${g('glow')})`} />
-      <g fill="#FFFFFF" opacity="0.9">
-        <path d={STAR} transform="translate(22 62) scale(0.7)" />
-        <path d={STAR} transform="translate(164 78) scale(0.5)" />
-        <path d={STAR} transform="translate(150 196) scale(1)" />
-        <path d={STAR} transform="translate(24 158) scale(0.5)" />
-      </g>
-      <ellipse cx="100" cy="214" rx="54" ry="7" fill="#3B1F5E" opacity="0.12" />
+      <rect className="tile" width="200" height="240" />
+      <ellipse className="floor" cx="100" cy="214" rx="54" ry="7" />
 
       <g strokeLinejoin="round" strokeLinecap="round">
         {shape.body.map((d) => (
@@ -155,7 +140,6 @@ export function ListingImage({ listing, index = 0 }: { listing: Listing; index?:
           <path key={t.d} d={t.d} fill="none" stroke={art.accent} strokeWidth={t.w} />
         ))}
       </g>
-      <path d={STAR} transform="translate(120 90) scale(0.55)" fill="#FFFFFF" opacity="0.95" />
     </svg>
   )
 }

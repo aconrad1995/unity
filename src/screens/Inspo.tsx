@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { CameraIcon, CloseIcon, PlusIcon, Sparkle } from '../art'
+import { CameraIcon, CloseIcon, PlusIcon } from '../art'
 import { APP_NAME, BRANDS, cleanBrand } from '../data'
 import { NO_ONE, nameOf, shrinkPhoto, type Look, type Store } from '../store'
 import { Avatar } from './ProfilePage'
@@ -49,7 +49,7 @@ export function InspoPage({ store }: { store: Store }) {
 
         {fitLook && (
           <section aria-labelledby="fit-h" className="fit-week">
-            <h2 id="fit-h" className="section-h section-h-in"><Sparkle size={20} /> Fit of the week</h2>
+            <h2 id="fit-h" className="section-h section-h-in">Fit of the week</h2>
             <a href={`#/look/${fitLook.id}`} className="fit-card">
               <img src={photoUrl(fitLook)} alt={fitLook.caption || 'Fit of the week'} />
               <span className="fit-body">
@@ -119,7 +119,7 @@ export function LookPage({ store, id }: { store: Store; id: string }) {
         <div className="detail-gallery">
           <div className="detail-photo">
             <img className="photo" src={photoUrl(look, shot)} alt={look.caption || 'An outfit look'} />
-            {isFit && <span className="fit-flag"><Sparkle size={14} /> Fit of the week</span>}
+            {isFit && <span className="fit-flag">Fit of the week</span>}
           </div>
           {look.photoCount > 1 && (
             <ul className="thumbs" aria-label="More photos">
