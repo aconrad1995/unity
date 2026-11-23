@@ -115,6 +115,7 @@ export default function Events() {
               {isGoing && <CheckIcon />} {isGoing ? 'I’m going' : 'Mark as going'}
             </button>
           </div>
+          {!ev.tba && !ev.via && d.away > 6 && <a className="link-btn event-shop" href={`#/shop-for/${encodeURIComponent(ev.id)}`}>Find a fit that arrives in time</a>}
         </div>
       </li>
     )

@@ -3,7 +3,7 @@ import { BellIcon, CameraIcon, HeartIcon, SearchIcon } from '../art'
 import type { Alerts } from '../alerts'
 import { APP_NAME, CATEGORIES, FEATURED, SIZES, arrivesBefore, conditionLabel, featuredFor } from '../data'
 import { useGoing } from '../going'
-import { dateParts } from '../events'
+import { dateParts, findEvent } from '../events'
 import { bumpStat, readProfile, type Store } from '../store'
 import { hasSignals, note, noteSearch, readTaste, score } from '../taste'
 import { Card } from './Card'
@@ -11,14 +11,17 @@ import { BackFrom, Countdown } from './Countdown'
 
 type Sort = 'you' | 'new' | 'low' | 'high'
 
-export default function Shop({ store, alerts, initialBrand = '' }: { store: Store; alerts: Alerts; initialBrand?: string }) {
+export default function Shop({ store, alerts, initialBrand = '', forEvent }: { store: Store; alerts: Alerts; initialBrand?: string; forEvent?: string }) {
   const [query, setQuery] = useState('')
   const [brand, setBrand] = useState(initialBrand)
   const [category, setCategory] = useState('')
   const [size, setSize] = useState('')
   // With a festival marked, shoppers can keep only what should arrive before it.
-  const nextFest = useGoing().nextDated
-  const [inTime, setInTime] = useState(false)
+  // A festival picked from Events ("Find a fit") wins over the next one on your list.
+  const picked = forEvent ? findEvent(forEvent) : undefined
+  const goingNext = useGoing().nextDated
+  const nextFest = picked && !picked.tba ? picked : goingNext
+  const [inTime, setInTime] = useState(!!picked && !picked.tba)
   const timeFilter = inTime && nextFest ? nextFest : undefined
   // What this shopper is into, read once per visit so the order doesn't jump while they browse.
   const [taste] = useState(readTaste)
@@ -195,7 +198,7 @@ export default function Shop({ store, alerts, initialBrand = '' }: { store: Stor
             <span className="in-time-box" aria-hidden="true" />
             <span>
               <strong>Arrives before {nextFest.name}</strong>
-              <span>Only outfits that should reach you by {dateParts(nextFest.date, 1).range}</span>
+              <span>Only outfits that should reach you before {dateParts(nextFest.date, 1).range}</span>
             </span>
           </button>
         )}

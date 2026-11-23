@@ -68,7 +68,7 @@ export interface RaveEvent {
 
 /** Ids come from the name and start date, so adding or reordering events never changes someone else's.
     When an expected-month festival gets real dates, keep its old id with `id` so "I'm going" survives. */
-const slug = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+const slug = (x: string) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 type Extra = { note?: string; id?: string }
 const e = (name: string, city: string, place: string, lat: number, lng: number, date: string, days: number, url: string, genre: Genre, extra: Extra = {}): RaveEvent => ({
   id: extra.id ?? `${slug(name)}-${date}`, name, city, place, lat, lng, date, days, url, genre, note: extra.note,
@@ -147,6 +147,9 @@ const EVENTS: RaveEvent[] = [
   tba('Lights All Night', 'Dallas, TX', 'Fair Park', 32.7795, -96.7597, '2027-12', 'https://lightsallnight.com', 'mixed'),
   tba('Countdown NYE', 'San Bernardino, CA', 'NOS Event Center', 34.1083, -117.2898, '2027-12', 'https://countdownnye.com', 'mixed'),
 ]
+
+/** One of the checked festivals by id, for links like "shop for this festival". */
+export const findEvent = (id: string) => EVENTS.find((x) => x.id === id)
 
 /** The last day of an event, as YYYY-MM-DD. */
 export function lastDay(ev: { date: string; days: number; tba?: boolean }) {
