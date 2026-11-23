@@ -38,14 +38,14 @@ export const welcomeMail = (to) => ({
   to,
   subject: 'Your Unity account is ready',
   text: [
-    'Your Unity account is set up with this email.',
+    'Welcome to Unity.',
     '',
-    'Sign in with it on any phone to get your listings, chats and saved outfits back.',
+    'Sign in on any phone to pick up your listings, chats and saved outfits:',
     `${PUBLIC_URL}/#/you/account/signin`,
     '',
-    'If you forget your password, choose "Forgot your password?" on the sign-in screen and we’ll email you a link.',
+    'Forgot your password? Tap "Forgot your password?" when you sign in and we’ll send you a link.',
     '',
-    'Didn’t make this account? You can ignore this email.',
+    'If you didn’t make this account, you can ignore this email.',
   ].join('\n'),
 })
 
