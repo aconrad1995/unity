@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { InstallCard } from './InstallCard'
 import { PushCard } from './PushCard'
-import { CameraIcon, CloseIcon, ProfileIcon } from '../art'
+import { CameraIcon, CloseIcon, InstagramIcon, ProfileIcon } from '../art'
 import { APP_NAME, BRANDS, SIZES, UP_FOR, VIBES, cleanBrand } from '../data'
-import { applyMoveCode, moveCode, shrinkPhoto, useProfile, type Store } from '../store'
+import { applyMoveCode, instagramOf, moveCode, shrinkPhoto, useProfile, type Store } from '../store'
 import { readTaste, resetTaste, topOf } from '../taste'
 import { Card } from './Card'
 import { BackFrom, Countdown } from './Countdown'
@@ -100,6 +100,17 @@ export default function ProfilePage({ store }: { store: Store }) {
             <RoleBadge role={store.myRole} />
             {profile.photo && <button type="button" className="link-btn" onClick={() => update({ photo: '' })}>Remove picture</button>}
           </div>
+          <label className="field me-insta">
+            <span>Instagram</span>
+            <span className="hint">Shows on your listings and seller page, so buyers can see how you style your fits.</span>
+            <span className="insta-input"><InstagramIcon /><span aria-hidden="true">@</span>
+              <input value={profile.instagram} onChange={(e) => update({ instagram: e.target.value.replace(/^@/, '') })}
+                placeholder="yourhandle" maxLength={80} autoComplete="off" autoCapitalize="none" spellCheck={false} />
+            </span>
+          </label>
+          {profile.instagram.trim() && !instagramOf(profile.instagram) && <p className="error" role="alert">That doesn’t look like an Instagram handle. Use letters, numbers, dots and underscores, like glitter.babe_</p>}
+          {store.handleRefused && <p className="error" role="alert">That Instagram name belongs to the {APP_NAME} team. Use your own handle.</p>}
+          {store.me && <a className="inline-link me-seller-link" href={`#/seller/${store.me}`}>See your seller page and ratings</a>}
           {store.nameRefused && <p className="error" role="alert">That name is kept for the {APP_NAME} team, so others can’t pretend to be them. Pick a different name.</p>}
           {photoProblem && <p className="error" role="alert">{photoProblem}</p>}
           {saveFailed && <p className="error" role="alert">This device is out of storage space, so your changes may not be kept. Try a smaller picture.</p>}
@@ -184,7 +195,7 @@ export default function ProfilePage({ store }: { store: Store }) {
         <a className="btn btn-soft" href="#/saved">My saved outfits{store.saved.length > 0 ? ` (${store.saved.length})` : ''}</a>
 
         <p className="fineprint">
-          Other people can see your name, picture, listings and “say hi about” picks. Your sizes, style,
+          Other people can see your name, picture, Instagram, listings, ratings and “say hi about” picks. Your sizes, style,
           favourite brands and what the shop has learned stay private on this device.
         </p>
         <MoveAccount />

@@ -21,7 +21,7 @@ const DIR = resolve(process.env.UNITY_DATA_DIR || join(process.cwd(), '.data'))
 const FILE = join(DIR, 'unity.json')
 const PHOTOS = join(DIR, 'photos')
 const MAX_BODY = 4_000_000
-const EMPTY = { rev: 1, listings: [], people: {}, messages: [], blocks: {}, reports: [], roles: {}, looks: [], fit: null, goingBy: {}, goingNames: {}, push: {}, pushSent: {} }
+const EMPTY = { rev: 1, listings: [], people: {}, messages: [], blocks: {}, reports: [], roles: {}, looks: [], fit: null, goingBy: {}, goingNames: {}, push: {}, pushSent: {}, ratings: {} }
 
 // Must match src/data.ts
 const CATEGORIES = ['Sets', 'Tops', 'Bottoms', 'Bodysuits', 'Bikini', 'Accessories']
@@ -164,6 +164,7 @@ function upgrade(d) {
   d.goingNames ??= {}
   d.push ??= {}
   d.pushSent ??= {}
+  d.ratings ??= {}
   d.authFails ??= []
   if (moved) {
     db = d
@@ -356,7 +357,41 @@ function snapshot(me) {
     myRole: roleOf(me),
     looks: db.looks.map(({ photos, ...l }) => ({ ...l, photoCount: photos.length })),
     fit: db.fit,
+    ratings: publicRatings(),
   }
+}
+
+/* ---------- Seller ratings ----------
+   You can rate someone only after a real two-way chat: you wrote to them and they wrote back.
+   One rating per person per seller, which they can change or take back. */
+const MAX_NOTES_SHOWN = 30
+function publicRatings() {
+  const out = {}
+  for (const [of, by] of Object.entries(db.ratings)) {
+    const list = Object.entries(by).map(([who, r]) => ({ by: who, ...r })).sort((x, y) => y.at - x.at)
+    if (!list.length) continue
+    out[of] = {
+      count: list.length,
+      average: Math.round((list.reduce((n, r) => n + r.stars, 0) / list.length) * 10) / 10,
+      recent: list.slice(0, MAX_NOTES_SHOWN),
+    }
+  }
+  return out
+}
+/** Whether "me" may rate "of": they're a seller, and both have written to each other (and nothing was dropped by a block). */
+function mayRate(me, of) {
+  if (!isId(of) || of === me) return false
+  if (!db.listings.some((l) => l.ownerId === of)) return false
+  const wrote = db.messages.some((m) => m.from === me && m.to === of && !m.dropped)
+  const replied = db.messages.some((m) => m.from === of && m.to === me && !m.dropped)
+  return wrote && replied
+}
+
+/** An Instagram handle from whatever was typed: "@name", "name" or a profile link. '' when it isn't one. */
+function instagramOf(v) {
+  if (typeof v !== 'string') return ''
+  const h = v.trim().replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/^@/, '').replace(/[/?#].*$/, '')
+  return /^[A-Za-z0-9._]{1,30}$/.test(h) ? h : ''
 }
 
 function checkLook(b) {
@@ -534,6 +569,10 @@ export async function api(req, res, next) {
       if (!isStaff(me) && nameReserved(name, me)) throw new Refuse(400, 'name_reserved')
       const was = db.people[me]
       const next = { name, photo: '', upFor: Array.isArray(b.upFor) ? b.upFor.map((x) => text(x, 40)).filter(Boolean).slice(0, 8) : [] }
+      const instagram = instagramOf(b.instagram)
+      // The shop's own handle can't be borrowed to look official.
+      if (instagram && !isStaff(me) && /^unity/.test(squash(instagram))) throw new Refuse(400, 'handle_reserved')
+      if (instagram) next.instagram = instagram
       if (photoOk(b.photo, 400_000)) {
         next.photo = `/api/avatar/${me}/${sumOf(b.photo)}`
         next.photoType = b.photo.slice(11, b.photo.indexOf(';'))
@@ -589,6 +628,31 @@ export async function api(req, res, next) {
         save()
       }
       return send(res, 200, { counts: goingCounts() })
+    }
+
+    // Rate a seller, change your rating, or take it back.
+    if (path === 'ratings' && (req.method === 'PUT' || req.method === 'DELETE')) {
+      if (!allow(`rate:${me}`, 30, DAY)) throw new Refuse(429, 'rate_limited')
+      const b = await readBody(req)
+      if (!isId(b.of) || b.of === me) throw new Refuse(400, 'bad_rating')
+      if (req.method === 'DELETE') {
+        if (db.ratings[b.of]?.[me]) {
+          delete db.ratings[b.of][me]
+          if (!Object.keys(db.ratings[b.of]).length) delete db.ratings[b.of]
+          save()
+        }
+        return send(res, 200, snapshot(me))
+      }
+      const stars = typeof b.stars === 'number' ? b.stars : NaN
+      if (!Number.isInteger(stars) || stars < 1 || stars > 5) throw new Refuse(400, 'bad_rating')
+      if (!mayRate(me, b.of)) throw new Refuse(403, 'chat_first')
+      const was = db.ratings[b.of]?.[me]
+      const note = text(b.note, 200)
+      if (!was || was.stars !== stars || was.note !== note) {
+        db.ratings[b.of] = { ...db.ratings[b.of], [me]: { stars, note, at: Date.now() } }
+        save()
+      }
+      return send(res, 200, snapshot(me))
     }
 
     if (req.method === 'POST' && path === 'listings') {
@@ -786,6 +850,16 @@ export async function api(req, res, next) {
       r.resolvedBy = me
       save()
       return send(res, 200, { reports: db.reports })
+    }
+
+    // The team takes down a rating that breaks the rules.
+    if (req.method === 'POST' && path === 'team/rating-remove') {
+      const b = await readBody(req)
+      if (!db.ratings[b.of]?.[b.by]) throw new Refuse(404, 'not_found')
+      delete db.ratings[b.of][b.by]
+      if (!Object.keys(db.ratings[b.of]).length) delete db.ratings[b.of]
+      save()
+      return send(res, 200, snapshot(me))
     }
 
     if (req.method === 'POST' && path === 'team/fit') {

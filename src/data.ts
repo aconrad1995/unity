@@ -168,6 +168,8 @@ export interface Profile {
   brands: string[]
   vibes: string[]
   upFor: string[]
+  /** Instagram handle without the @. Public, on listings and the seller page. */
+  instagram: string
 }
 
-export const EMPTY_PROFILE: Profile = { name: '', photo: '', sizes: [], brands: [], vibes: [], upFor: [] }
+export const EMPTY_PROFILE: Profile = { name: '', photo: '', sizes: [], brands: [], vibes: [], upFor: [], instagram: '' }

@@ -46,7 +46,15 @@ export function deviceKey(): string {
   return key
 }
 
-export interface Person { name: string; photo: string; upFor: string[] }
+export interface Person { name: string; photo: string; upFor: string[]; instagram?: string }
+export interface Rating { by: string; stars: number; note: string; at: number }
+export interface RatingSummary { count: number; average: number; recent: Rating[] }
+
+/** An Instagram handle from "@name", "name" or a profile link, the same way the server reads it. '' when it isn't one. */
+export function instagramOf(v: string): string {
+  const h = v.trim().replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/^@/, '').replace(/[/?#].*$/, '')
+  return /^[A-Za-z0-9._]{1,30}$/.test(h) ? h : ''
+}
 export interface Message { id: string; from: string; to: string; text: string; listingId?: string; about?: string; at: number; state?: 'sending' | 'failed' | 'rejected'; why?: string }
 export type Role = '' | 'owner' | 'admin'
 export interface Look { id: string; ownerId: string; caption: string; brands: string[]; photoCount: number; createdAt: number }
@@ -54,9 +62,9 @@ export interface Fit { lookId: string; note: string; at: number; by: string }
 export interface Report { id: string; by: string; user: string; reason: string; at: number; resolved?: number; evidence: Message[] }
 interface Shared {
   rev: number; me: string; listings: Listing[]; people: Record<string, Person>; messages: Message[]; blocked: string[]
-  roles: Record<string, Role>; myRole: Role; looks: Look[]; fit: Fit | null
+  roles: Record<string, Role>; myRole: Role; looks: Look[]; fit: Fit | null; ratings: Record<string, RatingSummary>
 }
-const NOTHING: Shared = { rev: 0, me: '', listings: [], people: {}, messages: [], blocked: [], roles: {}, myRole: '', looks: [], fit: null }
+const NOTHING: Shared = { rev: 0, me: '', listings: [], people: {}, messages: [], blocked: [], roles: {}, myRole: '', looks: [], fit: null, ratings: {} }
 
 export const NO_ONE: Person = { name: '', photo: '', upFor: [] }
 export const nameOf = (p: Person | undefined) => p?.name.trim() || 'Someone new'
@@ -87,7 +95,7 @@ function sumOf(s: string) {
   return (h >>> 0).toString(36)
 }
 const samePerson = (a: Person | undefined, b: Person, me: string) =>
-  !!a && a.name === b.name && a.photo === (b.photo ? `/api/avatar/${me}/${sumOf(b.photo)}` : '') && a.upFor.join('|') === b.upFor.join('|')
+  !!a && a.name === b.name && a.photo === (b.photo ? `/api/avatar/${me}/${sumOf(b.photo)}` : '') && a.upFor.join('|') === b.upFor.join('|') && (a.instagram ?? '') === (b.instagram ?? '')
 
 /* ---------- Moving to another phone or browser ----------
    Everything someone has listed belongs to this device's secret key. Showing it as a "move code"
@@ -147,7 +155,7 @@ export function useStore() {
   const outboxRef = useRef(outbox)
   const inflight = useRef(new Set<string>())
   const refusedProfile = useRef('')
-  const [nameRefused, setNameRefused] = useState(false)
+  const [refusal, setRefusal] = useState<'' | 'name' | 'handle'>('')
   outboxRef.current = outbox
 
   const take = useCallback((next: Shared | null) => {
@@ -201,19 +209,20 @@ export function useStore() {
         }
         // Keep the public part of the profile (name, picture, "say hi about") up to date.
         const p = readProfile()
-        const mine: Person = { name: p.name.trim(), photo: p.photo, upFor: p.upFor }
+        const ig = instagramOf(p.instagram ?? '')
+        const mine: Person = { name: p.name.trim(), photo: p.photo, upFor: p.upFor, ...(ig ? { instagram: ig } : {}) }
         const meId = latest.current.me
         const known = latest.current.people[meId]
         const sig = JSON.stringify(mine)
-        if (!samePerson(known, mine, meId) && sig !== refusedProfile.current && (known || mine.name || mine.photo || mine.upFor.length > 0)) {
+        if (!samePerson(known, mine, meId) && sig !== refusedProfile.current && (known || mine.name || mine.photo || mine.upFor.length > 0 || ig)) {
           const r = await call('PUT', 'me', mine)
           if (r.data) {
             take(r.data)
-            setNameRefused(false)
-          } else if (r.error === 'name_reserved') {
-            // Not tried again until the name changes.
+            setRefusal('')
+          } else if (r.error === 'name_reserved' || r.error === 'handle_reserved') {
+            // Not tried again until the name or handle changes.
             refusedProfile.current = sig
-            setNameRefused(true)
+            setRefusal(r.error === 'name_reserved' ? 'name' : 'handle')
           }
         }
       }
@@ -291,6 +300,21 @@ export function useStore() {
     return (r.data as unknown as { reports?: Report[] } | null)?.reports ?? null
   }, [])
 
+  /** Rate a seller (1 to 5 stars and an optional note). Returns why it failed, or '' when it worked. */
+  const rate = useCallback(async (of: string, stars: number, note: string) => {
+    const r = await call('PUT', 'ratings', { of, stars, note })
+    if (take(r.data)) return ''
+    return r.error === 'chat_first' ? 'You can rate a seller once you’ve both written in a chat.' : r.error === 'rate_limited' ? 'You’ve rated a lot today. Try again tomorrow.' : r.status === 0 ? 'Unity can’t be reached. Check your connection.' : 'Your rating could not be saved. Try again in a moment.'
+  }, [take])
+  const unrate = useCallback(async (of: string) => take(await fetchData('DELETE', 'ratings', { of })), [take])
+  const removeRating = useCallback(async (of: string, by: string) => take(await fetchData('POST', 'team/rating-remove', { of, by })), [take])
+  /** Ratings are for sellers you've had a real two-way chat with. */
+  const canRate = useCallback((of: string) => {
+    const s = latest.current
+    if (!of || of === s.me || !s.listings.some((l) => l.ownerId === of)) return false
+    return s.messages.some((m) => m.from === s.me && m.to === of) && s.messages.some((m) => m.from === of && m.to === s.me)
+  }, [])
+
   const setBlocked = useCallback(async (user: string, on: boolean) => take(await fetchData('POST', 'block', { user, on })), [take])
   const report = useCallback(async (user: string, reason: string) => take(await fetchData('POST', 'report', { user, reason })), [take])
 
@@ -323,8 +347,8 @@ export function useStore() {
 
   return {
     listings, mine, saved, online, me: shared.me, people: shared.people, blocked: shared.blocked, chats, unread,
-    roles: shared.roles ?? {}, myRole: shared.myRole ?? '', looks: shared.looks ?? [], fit: shared.fit ?? null,
-    nameRefused, addListing, editListing, removeListing, toggleSaved, sendMessage, retryMessage, discardMessage, setBlocked, report, markRead,
+    roles: shared.roles ?? {}, myRole: shared.myRole ?? '', looks: shared.looks ?? [], fit: shared.fit ?? null, ratings: shared.ratings ?? {},
+    nameRefused: refusal === 'name', handleRefused: refusal === 'handle', rate, unrate, removeRating, canRate, addListing, editListing, removeListing, toggleSaved, sendMessage, retryMessage, discardMessage, setBlocked, report, markRead,
     addLook, removeLook, claimRole, pickFit, teamReports, resolveReport,
   }
 }

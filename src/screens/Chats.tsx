@@ -5,6 +5,7 @@ import { NO_ONE, nameOf, readProfile, type Store } from '../store'
 import { Avatar } from './ProfilePage'
 import { PageHeader } from './PageHeader'
 import { RoleBadge } from './Team'
+import { InstagramLink, RateCard, RatingLine } from './Seller'
 
 function when(at: number): string {
   const d = new Date(at)
@@ -121,13 +122,21 @@ export function ChatThread({ store, user, listingId }: { store: Store; user: str
       <main className="page thread">
         {store.online === false && <Offline />}
 
-        {(person.photo || person.upFor.length > 0 || store.roles[user]) && (
-          <div className="thread-who">
-            <Avatar profile={person} size={52} />
-            <RoleBadge role={store.roles[user]} />
-            {person.upFor.length > 0 && <p className="seller-upfor">{name} is up for: {person.upFor.join(', ').toLowerCase()}</p>}
-          </div>
-        )}
+        {(() => {
+          const sells = store.listings.some((l) => l.ownerId === user)
+          if (!sells && !person.photo && !person.upFor.length && !store.roles[user] && !person.instagram) return null
+          return (
+            <div className="thread-who">
+              <Avatar profile={person} size={52} />
+              <div className="thread-who-text">
+                <RoleBadge role={store.roles[user]} />
+                {sells && <a className="thread-seller" href={`#/seller/${user}`}><RatingLine summary={store.ratings[user]} /> <span className="inline-link">Seller page</span></a>}
+                <InstagramLink handle={person.instagram} />
+                {person.upFor.length > 0 && <p className="seller-upfor">{name} is up for: {person.upFor.join(', ').toLowerCase()}</p>}
+              </div>
+            </div>
+          )
+        })()}
 
         {about && (
           <a className="thread-about" href={`#/item/${about.id}`}>
@@ -169,6 +178,8 @@ export function ChatThread({ store, user, listingId }: { store: Store; user: str
         ) : (
           !isBlocked && <p className="thread-start">Say hi to {name}. Only the two of you can see this chat.</p>
         )}
+
+        {!isBlocked && <RateCard key={user} store={store} user={user} />}
 
         {isBlocked ? (
           <div className="notice blocked-note">

@@ -11,6 +11,7 @@ import { ChatList, ChatThread } from './screens/Chats'
 import { ReportsPage, TeamPage } from './screens/Team'
 import { InspoPage, LookPage, PostLook } from './screens/Inspo'
 import AlertsPage from './screens/AlertsPage'
+import { SellerPage } from './screens/Seller'
 import { useAlerts } from './alerts'
 
 export default function App() {
@@ -31,6 +32,7 @@ export default function App() {
   else if (page === 'team') screen = id === 'reports' ? <ReportsPage store={store} /> : <TeamPage store={store} />
   else if (page === 'inspo') screen = id === 'new' ? <PostLook store={store} /> : <InspoPage store={store} />
   else if (page === 'look' && id) screen = <LookPage key={id} store={store} id={id} />
+  else if (page === 'seller' && id) screen = <SellerPage key={id} store={store} id={id} />
   else if (page === 'alerts') screen = <AlertsPage store={store} alerts={alerts} />
   else if (page === 'brand' && id) screen = <Shop key={id} store={store} alerts={alerts} initialBrand={decodeURIComponent(id)} />
   else if (page === 'shop-for' && id) screen = <Shop key={`for-${id}`} store={store} alerts={alerts} forEvent={decodeURIComponent(id)} />
