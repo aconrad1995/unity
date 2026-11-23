@@ -13,6 +13,7 @@
   --accent-hover: #e01f80;
   --pink-soft: #ffe1ef;
   --gold: #ffd93d;
+  --gold-ink: #8a6400;   /* stars on white */
   --ink: #17121c;
   --ink-soft: #5a5160;
   --on-accent: #17121c;
@@ -626,3 +627,41 @@ thead th { font-size: 0.8125rem; color: var(--ink-soft); border-bottom: 2px soli
 .install-card p { color: var(--ink-soft); margin-top: 4px; }
 .push-icon { width: 56px; height: 56px; display: grid; place-items: center; border-radius: 12px; background: var(--pink-soft); color: var(--accent-text); }
 .event-shop { justify-self: start; padding: 8px 0 0; }
+
+/* ---------- Seller ratings and Instagram ---------- */
+.stars { display: inline-flex; gap: 2px; color: var(--gold-ink); vertical-align: -2px; }
+.stars svg { width: 16px; height: 16px; stroke-width: 1.6; }
+.rating-line { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
+.rating-figure { font-weight: 600; }
+.rating-count, .rating-none { color: var(--ink-soft); }
+.seller-card .rating-line { display: flex; margin: 2px 0; }
+.seller-insta { display: block; color: var(--blue-ink); font-size: 0.9375rem; font-weight: 500; }
+.insta-link { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; color: var(--blue-ink); font-weight: 600; }
+.insta-link svg { width: 18px; height: 18px; stroke-width: 1.8; }
+.seller-page { display: grid; gap: 16px; max-width: 760px; align-content: start; }
+.seller-head { display: flex; align-items: center; gap: 16px; }
+.seller-head-text { display: grid; justify-items: start; gap: 4px; min-width: 0; }
+.seller-name { font: 800 clamp(1.5rem, 6vw, 2rem)/1.05 var(--display); text-transform: uppercase; overflow-wrap: break-word; }
+.reviews { display: grid; gap: 12px; }
+.review { display: grid; gap: 4px; background: var(--cloud); border-radius: var(--r-card); padding: 12px 16px; }
+.review-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.review-meta { font-size: 0.8125rem; color: var(--ink-soft); }
+.review .link-btn { justify-self: start; }
+.thread-who-text { display: grid; justify-items: start; gap: 2px; min-width: 0; }
+.thread-seller { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 32px; }
+.rate-card { display: grid; gap: 12px; background: var(--cloud); border-radius: var(--r-card); padding: 12px 16px; border: var(--hair); }
+.rate-done { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-weight: 500; }
+.rate-done .btn { min-height: 44px; }
+.rate-card > .link-btn { justify-self: start; }
+.star-pick { display: flex; gap: 4px; }
+.star-pick button { width: 48px; height: 48px; display: grid; place-items: center; border: 0; border-radius: 12px; background: var(--sky); color: var(--ink-soft); }
+.star-pick button.on { color: var(--gold-ink); }
+.star-pick button svg { width: 28px; height: 28px; stroke-width: 1.6; }
+.star-pick button:focus-visible { outline: 3px solid var(--blue-ink); outline-offset: 2px; }
+.insta-input { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: 4px; background: var(--cloud); border: var(--hair); border-radius: var(--r-ctl); padding: 0 12px; }
+.insta-input:focus-within { outline: 3px solid var(--blue-ink); outline-offset: 2px; }
+.insta-input svg { width: 18px; height: 18px; color: var(--ink-soft); margin-right: 4px; }
+.insta-input > span { color: var(--ink-soft); font-weight: 500; }
+.insta-input input { border: 0; outline: 0; background: none; min-height: 48px; padding: 0; min-width: 0; }
+.me-insta, .me-seller-link { grid-column: 1 / -1; }
+.me-seller-link { justify-self: start; min-height: 44px; display: inline-flex; align-items: center; }

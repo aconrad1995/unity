@@ -8,6 +8,7 @@ import { noteListing } from '../taste'
 import { SaveButton } from './Card'
 import { RoleBadge } from './Team'
 import { PageHeader } from './PageHeader'
+import { RatingLine } from './Seller'
 
 export default function ListingPage({ store, id }: { store: Store; id: string }) {
   const listing: Listing | undefined = store.listings.find((l) => l.id === id)
@@ -106,14 +107,16 @@ export default function ListingPage({ store, id }: { store: Store; id: string })
 
           <p className="detail-desc">{listing.description}</p>
           {seller ? (
-            <a className="seller-card" href={isMine ? '#/you' : `#/chats/${listing.ownerId}/${listing.id}`}>
+            <a className="seller-card" href={`#/seller/${listing.ownerId}`}>
               <Avatar profile={seller} size={52} />
               <span>
                 <strong>Sold by {isMine ? 'you' : nameOf(seller)}</strong>
                 <RoleBadge role={store.roles[listing.ownerId!]} />
+                <RatingLine summary={store.ratings[listing.ownerId!]} />
+                {seller.instagram && <span className="seller-insta">@{seller.instagram}</span>}
                 {seller.upFor.length > 0
                   ? <span className="seller-upfor">Say hi about: {seller.upFor.join(', ').toLowerCase()}</span>
-                  : isMine && <span className="seller-upfor">Tap to edit your profile</span>}
+                  : isMine && <span className="seller-upfor">Tap to see your seller page</span>}
               </span>
             </a>
           ) : (
