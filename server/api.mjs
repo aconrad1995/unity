@@ -11,8 +11,9 @@
 //  - every field is checked, every action is rate-limited
 //  - a message with the same id is stored once, so a retry never double-posts
 //  - the data file is written safely, backed up, and never silently reset
-import { createHash, randomUUID, timingSafeEqual } from 'node:crypto'
-import { closeSync, copyFileSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeSync } from 'node:fs'
+import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID, scrypt as scryptCb, timingSafeEqual } from 'node:crypto'
+import { promisify } from 'node:util'
+import { closeSync, copyFileSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync, writeSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { edmtrainEvents } from './edmtrain.mjs'
 import { checkSubscription, daysBetween, pacificNow, sendPush, setupPush } from './push.mjs'
@@ -21,7 +22,7 @@ const DIR = resolve(process.env.UNITY_DATA_DIR || join(process.cwd(), '.data'))
 const FILE = join(DIR, 'unity.json')
 const PHOTOS = join(DIR, 'photos')
 const MAX_BODY = 4_000_000
-const EMPTY = { rev: 1, listings: [], people: {}, messages: [], blocks: {}, reports: [], roles: {}, looks: [], fit: null, goingBy: {}, goingNames: {}, push: {}, pushSent: {}, ratings: {} }
+const EMPTY = { rev: 1, listings: [], people: {}, messages: [], blocks: {}, reports: [], roles: {}, looks: [], fit: null, goingBy: {}, goingNames: {}, push: {}, pushSent: {}, ratings: {}, accounts: {}, accountOf: {} }
 
 // Must match src/data.ts
 const CATEGORIES = ['Sets', 'Tops', 'Bottoms', 'Bodysuits', 'Bikini', 'Accessories']
@@ -165,6 +166,8 @@ function upgrade(d) {
   d.push ??= {}
   d.pushSent ??= {}
   d.ratings ??= {}
+  d.accounts ??= {}
+  d.accountOf ??= {}
   d.authFails ??= []
   if (moved) {
     db = d
@@ -358,6 +361,7 @@ function snapshot(me) {
     looks: db.looks.map(({ photos, ...l }) => ({ ...l, photoCount: photos.length })),
     fit: db.fit,
     ratings: publicRatings(),
+    account: db.accountOf[me] ?? null,
   }
 }
 
@@ -385,6 +389,53 @@ function mayRate(me, of) {
   const wrote = db.messages.some((m) => m.from === me && m.to === of && !m.dropped)
   const replied = db.messages.some((m) => m.from === of && m.to === me && !m.dropped)
   return wrote && replied
+}
+
+/* ---------- Accounts: an email and password that lead back to this device's secret key ----------
+   Signing in on another phone hands that phone the same secret key, so it becomes the same person:
+   same listings, chats, ratings and team role. The key is kept encrypted with a server secret
+   (UNITY_ACCOUNT_SECRET, or account-secret next to the data file); passwords are kept as scrypt hashes. */
+const scrypt = promisify(scryptCb)
+const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,100}\.[a-z]{2,24}$/i
+let accountSecret
+function secret() {
+  if (accountSecret) return accountSecret
+  const env = process.env.UNITY_ACCOUNT_SECRET
+  if (env && /^[0-9a-f]{64}$/i.test(env)) return (accountSecret = Buffer.from(env, 'hex'))
+  const file = join(DIR, 'account-secret')
+  try {
+    if (existsSync(file)) {
+      const b = Buffer.from(readFileSync(file, 'utf8').trim(), 'hex')
+      if (b.length === 32) return (accountSecret = b)
+    }
+  } catch {
+    /* made below */
+  }
+  const b = randomBytes(32)
+  mkdirSync(DIR, { recursive: true })
+  writeFileSync(file, b.toString('hex'), { mode: 0o600 })
+  return (accountSecret = b)
+}
+function seal(key) {
+  const iv = randomBytes(12)
+  const c = createCipheriv('aes-256-gcm', secret(), iv)
+  const body = Buffer.concat([c.update(key, 'utf8'), c.final()])
+  return [iv, c.getAuthTag(), body].map((b) => b.toString('base64')).join('.')
+}
+function unseal(sealed) {
+  const [iv, tag, body] = sealed.split('.').map((x) => Buffer.from(x, 'base64'))
+  const d = createDecipheriv('aes-256-gcm', secret(), iv)
+  d.setAuthTag(tag)
+  return Buffer.concat([d.update(body), d.final()]).toString('utf8')
+}
+const hashOf = async (password, salt) => (await scrypt(password, Buffer.from(salt, 'hex'), 32)).toString('hex')
+const passwordOk = (v) => typeof v === 'string' && v.length >= 8 && v.length <= 200
+const emailOf = (v) => (typeof v === 'string' && v.trim().length <= 160 && EMAIL.test(v.trim()) ? v.trim().toLowerCase() : '')
+async function checkPassword(account, password) {
+  const want = Buffer.from(account?.hash ?? '0'.repeat(64), 'hex')
+  // Unknown emails take as long as known ones, so timing doesn't reveal who has an account.
+  const got = Buffer.from(await hashOf(typeof password === 'string' ? password : '', account?.salt ?? '00'.repeat(16)), 'hex')
+  return !!account && got.length === want.length && timingSafeEqual(got, want)
 }
 
 /** An Instagram handle from whatever was typed: "@name", "name" or a profile link. '' when it isn't one. */
@@ -630,6 +681,47 @@ export async function api(req, res, next) {
       return send(res, 200, { counts: goingCounts() })
     }
 
+    // Make an account for this device's identity.
+    if (req.method === 'POST' && path === 'account/signup') {
+      if (!allow(`signup:${me}`, 10, HOUR)) throw new Refuse(429, 'rate_limited')
+      const b = await readBody(req)
+      const email = emailOf(b.email)
+      if (!email) throw new Refuse(400, 'bad_email')
+      if (!passwordOk(b.password)) throw new Refuse(400, 'weak_password')
+      if (db.accountOf[me]) throw new Refuse(409, 'has_account')
+      if (db.accounts[email]) throw new Refuse(409, 'email_taken')
+      const salt = randomBytes(16).toString('hex')
+      const hash = await hashOf(b.password, salt)
+      if (db.accounts[email] || db.accountOf[me]) throw new Refuse(409, 'email_taken')
+      db.accounts[email] = { id: me, salt, hash, sealed: seal(key), at: Date.now() }
+      db.accountOf[me] = email
+      save()
+      return send(res, 200, snapshot(me))
+    }
+
+    // Sign in: hands back the account's secret key so this device becomes that person.
+    if (req.method === 'POST' && path === 'account/signin') {
+      const b = await readBody(req)
+      const email = emailOf(b.email)
+      if (!allow(`signin-ip:${ipOf(req)}`, 30, HOUR) || (email && !allow(`signin:${email}`, 10, HOUR))) throw new Refuse(429, 'rate_limited')
+      const account = email ? db.accounts[email] : undefined
+      if (!(await checkPassword(account, b.password))) throw new Refuse(401, 'wrong_login')
+      return send(res, 200, { key: unseal(account.sealed) })
+    }
+
+    if (req.method === 'POST' && path === 'account/password') {
+      if (!allow(`pw:${me}`, 10, HOUR)) throw new Refuse(429, 'rate_limited')
+      const b = await readBody(req)
+      const email = db.accountOf[me]
+      if (!email) throw new Refuse(404, 'no_account')
+      if (!(await checkPassword(db.accounts[email], b.current))) throw new Refuse(401, 'wrong_login')
+      if (!passwordOk(b.next)) throw new Refuse(400, 'weak_password')
+      const salt = randomBytes(16).toString('hex')
+      db.accounts[email] = { ...db.accounts[email], salt, hash: await hashOf(b.next, salt) }
+      save()
+      return send(res, 200, snapshot(me))
+    }
+
     // Rate a seller, change your rating, or take it back.
     if (path === 'ratings' && (req.method === 'PUT' || req.method === 'DELETE')) {
       if (!allow(`rate:${me}`, 30, DAY)) throw new Refuse(429, 'rate_limited')
@@ -850,6 +942,19 @@ export async function api(req, res, next) {
       r.resolvedBy = me
       save()
       return send(res, 200, { reports: db.reports })
+    }
+
+    // The team sets a new password for someone who forgot theirs (after checking it's really them).
+    if (req.method === 'POST' && path === 'team/account-reset') {
+      const b = await readBody(req)
+      const email = emailOf(b.email)
+      if (!email || !db.accounts[email]) throw new Refuse(404, 'not_found')
+      if (!passwordOk(b.password)) throw new Refuse(400, 'weak_password')
+      const salt = randomBytes(16).toString('hex')
+      db.accounts[email] = { ...db.accounts[email], salt, hash: await hashOf(b.password, salt) }
+      console.warn(`team: password reset for an account by ${me}`)
+      save()
+      return send(res, 200, { ok: true })
     }
 
     // The team takes down a rating that breaks the rules.

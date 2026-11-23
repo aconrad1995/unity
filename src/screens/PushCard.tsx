@@ -17,7 +17,7 @@ export function PushCard() {
   useEffect(() => {
     pushState().then(setState).catch(() => setState('unsupported'))
   }, [])
-  if (!state) return null
+  if (!state || state === 'blocked' || state === 'unsupported') return null
 
   const flip = async () => {
     setBusy(true)

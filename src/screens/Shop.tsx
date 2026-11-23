@@ -99,7 +99,7 @@ export default function Shop({ store, alerts, initialBrand = '', forEvent }: { s
               {APP_NAME}
             </a>
             <span className="top-links">
-              <a href="#/alerts" className="saved-link bell-link" aria-label={alerts.fresh > 0 ? `New for you: ${alerts.fresh} new ${alerts.fresh === 1 ? 'outfit' : 'outfits'}` : 'New for you'}>
+              <a href="#/alerts" className="saved-link bell-link" aria-label={alerts.fresh > 0 ? `Matches: ${alerts.fresh} new ${alerts.fresh === 1 ? 'outfit' : 'outfits'}` : 'Matches'}>
                 <BellIcon />
                 {alerts.fresh > 0 && <span className="tab-count bell-count" aria-hidden="true">{alerts.fresh}</span>}
               </a>
