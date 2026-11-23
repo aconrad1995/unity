@@ -13,6 +13,7 @@ import { ReportsPage, TeamPage } from './screens/Team'
 import { InspoPage, LookPage, PostLook } from './screens/Inspo'
 import AlertsPage from './screens/AlertsPage'
 import { SellerPage } from './screens/Seller'
+import { ResetPage } from './screens/Account'
 import { useAlerts } from './alerts'
 import { Component, type ReactNode } from 'react'
 
@@ -39,7 +40,7 @@ export default function App() {
   const store = useStore()
   const alerts = useAlerts(store)
   const [page, id, extra] = useRoute()
-  const tab = page === 'sell' ? 'sell' : page === 'chats' ? 'chats' : page === 'events' ? 'events' : page === 'you' || page === 'team' || page === 'inspo' || page === 'look' ? 'you' : 'shop'
+  const tab = page === 'sell' ? 'sell' : page === 'chats' ? 'chats' : page === 'events' ? 'events' : page === 'you' || page === 'reset' || page === 'team' || page === 'inspo' || page === 'look' ? 'you' : 'shop'
   // Inside a chat the bottom bar steps aside so it never covers the message box.
   const inThread = page === 'chats' && !!id
 
@@ -57,6 +58,7 @@ export default function App() {
   else if (page === 'alerts') screen = <AlertsPage store={store} alerts={alerts} />
   else if (page === 'brand' && id) screen = <Shop key={id} store={store} alerts={alerts} initialBrand={decodeURIComponent(id)} />
   else if (page === 'shop-for' && id) screen = <Shop key={`for-${id}`} store={store} alerts={alerts} forEvent={decodeURIComponent(id)} />
+  else if (page === 'reset' && id) screen = <ResetPage store={store} token={id} />
   else if (page === 'you') screen = <ProfilePage key={id ?? 'home'} store={store} section={id} />
   else screen = <Shop store={store} alerts={alerts} />
 

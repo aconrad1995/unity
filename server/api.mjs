@@ -16,13 +16,14 @@ import { promisify } from 'node:util'
 import { closeSync, copyFileSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync, writeSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { edmtrainEvents } from './edmtrain.mjs'
+import { mailReady, resetMail, sendMail, welcomeMail } from './mail.mjs'
 import { checkSubscription, daysBetween, pacificNow, sendPush, setupPush } from './push.mjs'
 
 const DIR = resolve(process.env.UNITY_DATA_DIR || join(process.cwd(), '.data'))
 const FILE = join(DIR, 'unity.json')
 const PHOTOS = join(DIR, 'photos')
 const MAX_BODY = 4_000_000
-const EMPTY = { rev: 1, listings: [], people: {}, messages: [], blocks: {}, reports: [], roles: {}, looks: [], fit: null, goingBy: {}, goingNames: {}, push: {}, pushSent: {}, ratings: {}, accounts: {}, accountOf: {} }
+const EMPTY = { rev: 1, listings: [], people: {}, messages: [], blocks: {}, reports: [], roles: {}, looks: [], fit: null, goingBy: {}, goingNames: {}, push: {}, pushSent: {}, ratings: {}, accounts: {}, accountOf: {}, resets: {} }
 
 // Must match src/data.ts
 const CATEGORIES = ['Sets', 'Tops', 'Bottoms', 'Bodysuits', 'Bikini', 'Accessories']
@@ -168,6 +169,7 @@ function upgrade(d) {
   d.ratings ??= {}
   d.accounts ??= {}
   d.accountOf ??= {}
+  d.resets ??= {}
   d.authFails ??= []
   if (moved) {
     db = d
@@ -363,6 +365,8 @@ function snapshot(me) {
     fit: db.fit,
     ratings: publicRatings(),
     account: db.accountOf[me] ?? null,
+    // Whether "Forgot your password?" can email a link, or has to go through the team.
+    mailOn: mailReady(),
   }
 }
 
@@ -430,6 +434,7 @@ function unseal(sealed) {
   return Buffer.concat([d.update(body), d.final()]).toString('utf8')
 }
 const hashOf = async (password, salt) => (await scrypt(password, Buffer.from(salt, 'hex'), 32)).toString('hex')
+const tokenTag = (token) => createHash('sha256').update(`unity-reset:${token}`).digest('hex')
 const passwordOk = (v) => typeof v === 'string' && v.length >= 8 && v.length <= 200
 const emailOf = (v) => (typeof v === 'string' && v.trim().length <= 160 && EMAIL.test(v.trim()) ? v.trim().toLowerCase() : '')
 async function checkPassword(account, password) {
@@ -700,6 +705,8 @@ export async function api(req, res, next) {
       db.accounts[email] = { id: me, salt, hash, sealed: seal(key), at: Date.now() }
       db.accountOf[me] = email
       save()
+      // Lets them know it worked, and shows early if the address was mistyped. Not waited on.
+      void sendMail(welcomeMail(email))
       return send(res, 200, snapshot(me))
     }
 
@@ -711,6 +718,43 @@ export async function api(req, res, next) {
       const account = email ? db.accounts[email] : undefined
       if (!(await checkPassword(account, b.password))) throw new Refuse(401, 'wrong_login')
       return send(res, 200, { key: unseal(account.sealed) })
+    }
+
+    // Forgot password: email a one-time link. The answer is the same whether or not the email has an
+    // account, so this can't be used to find out who uses Unity.
+    if (req.method === 'POST' && path === 'account/forgot') {
+      if (!mailReady()) throw new Refuse(503, 'mail_off')
+      const b = await readBody(req)
+      const email = emailOf(b.email)
+      if (!email) throw new Refuse(400, 'bad_email')
+      if (!allow(`forgot-ip:${ipOf(req)}`, 10, HOUR) || !allow(`forgot:${email}`, 3, HOUR)) throw new Refuse(429, 'rate_limited')
+      if (db.accounts[email]) {
+        const token = randomBytes(32).toString('base64url')
+        // Only a fingerprint of the link is kept, and a new link replaces any older one.
+        for (const [k, r] of Object.entries(db.resets)) if (r.email === email || r.exp < Date.now()) delete db.resets[k]
+        db.resets[tokenTag(token)] = { email, exp: Date.now() + HOUR }
+        save()
+        void sendMail(resetMail(email, token))
+      }
+      return send(res, 200, { sent: true })
+    }
+
+    // Reset: a valid link and a new password. Signs this device in, like signing in does.
+    if (req.method === 'POST' && path === 'account/reset') {
+      if (!allow(`reset-ip:${ipOf(req)}`, 20, HOUR)) throw new Refuse(429, 'rate_limited')
+      const b = await readBody(req)
+      const tag = typeof b.token === 'string' && b.token.length <= 100 ? tokenTag(b.token) : ''
+      const r = tag ? db.resets[tag] : undefined
+      if (!r || r.exp < Date.now() || !db.accounts[r.email]) {
+        if (r) { delete db.resets[tag]; save() }
+        throw new Refuse(410, 'link_expired')
+      }
+      if (!passwordOk(b.password)) throw new Refuse(400, 'weak_password')
+      const salt = randomBytes(16).toString('hex')
+      db.accounts[r.email] = { ...db.accounts[r.email], salt, hash: await hashOf(b.password, salt) }
+      delete db.resets[tag]
+      save()
+      return send(res, 200, { key: unseal(db.accounts[r.email].sealed) })
     }
 
     if (req.method === 'POST' && path === 'account/password') {
