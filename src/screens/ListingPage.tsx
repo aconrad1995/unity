@@ -110,7 +110,10 @@ export default function ListingPage({ store, id }: { store: Store; id: string })
             <p>{condition.help}</p>
           </div>
 
-          <p className="detail-desc">{listing.description}</p>
+          {/* A placeholder or a stray letter ("x") reads as broken, so say plainly there's nothing more. */}
+          {listing.description.trim().length >= 4 && listing.description !== 'No description added.'
+            ? <p className="detail-desc">{listing.description}</p>
+            : <p className="hint">No description yet. Ask the seller about fit and wear in a chat.</p>}
           {seller ? (
             <a className="seller-card" href={`#/seller/${listing.ownerId}`}>
               <Avatar profile={seller} size={52} />

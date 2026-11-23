@@ -17,17 +17,17 @@ and send me a screenshot.
 - [ ] The home screen app keeps its own sign-in, so sign in again here. Your listings appear.
 - [ ] Rotate the phone, then scroll the shop. Nothing gets cut off at the notch or the home bar.
 
-## 3. Turn alerts on (from the home screen app)
+## 3. Turn notifications on (from the home screen app)
 
-- [ ] You → Alerts card → **Turn alerts on**. iPhone asks to allow notifications. Tap Allow.
-- [ ] The card now says **Turn alerts off**.
+- [ ] You → Phone notifications card → **Turn notifications on**. iPhone asks to allow notifications. Tap Allow.
+- [ ] The card now says **Turn notifications off**.
 
-## 4. Get an alert
+## 4. Get a notification
 
-- [ ] Lock the phone that turned alerts on.
+- [ ] Lock the phone that turned notifications on.
 - [ ] From the other device, signed in as someone else, message that person about an outfit.
 - [ ] Within a minute, the locked phone shows "*Their name*: About *outfit*…".
-- [ ] Tap the alert. Unity opens straight into that chat.
+- [ ] Tap the notification. Unity opens straight into that chat.
 
 ## 5. Sell something (Mary's phone is best)
 

@@ -58,6 +58,12 @@ export function InspoPage({ store }: { store: Store }) {
                 {fitLook.brands.length > 0 && <span className="look-brands">Wearing {fitLook.brands.join(', ')}</span>}
               </span>
             </a>
+            {/* The card is one link to the look, so shopping the brands sits just under it. */}
+            {fitLook.brands.length > 0 && (
+              <div className="bubbles bubbles-wrap fit-shop" role="group" aria-label="Shop this look’s brands">
+                {fitLook.brands.slice(0, 3).map((b) => <a key={b} className="bubble" href={`#/brand/${encodeURIComponent(b)}`}>Shop {b}</a>)}
+              </div>
+            )}
           </section>
         )}
 

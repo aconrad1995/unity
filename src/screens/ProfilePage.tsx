@@ -113,7 +113,7 @@ function YouHome({ store }: { store: Store }) {
           Other people see your name, picture, Instagram, listings, ratings and “say hi about” picks. Your sizes, style,
           favorite brands and what the shop has learned stay private on this phone.
         </p>
-        <p className="fineprint fineprint-link"><a href="#/team">{store.myRole ? 'Team tools' : 'Team? Sign in'}</a></p>
+        <p className="fineprint fineprint-link"><a className="tap-link" href="#/team">{store.myRole ? 'Team tools' : 'Team? Sign in'}</a></p>
       </main>
     </>
   )
