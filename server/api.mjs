@@ -20,7 +20,7 @@ const DIR = resolve(process.env.UNITY_DATA_DIR || join(process.cwd(), '.data'))
 const FILE = join(DIR, 'unity.json')
 const PHOTOS = join(DIR, 'photos')
 const MAX_BODY = 4_000_000
-const EMPTY = { rev: 1, listings: [], people: {}, messages: [], blocks: {}, reports: [], roles: {}, looks: [], fit: null }
+const EMPTY = { rev: 1, listings: [], people: {}, messages: [], blocks: {}, reports: [], roles: {}, looks: [], fit: null, goingBy: {} }
 
 // Must match src/data.ts
 const CATEGORIES = ['Sets', 'Tops', 'Bottoms', 'Bodysuits', 'Bikini', 'Accessories']
@@ -159,6 +159,7 @@ function upgrade(d) {
     }
   }
   d.roleCodes ??= {}
+  d.goingBy ??= {}
   d.authFails ??= []
   if (moved) {
     db = d
@@ -393,6 +394,18 @@ function nameReserved(name, me) {
 }
 
 /* ---------- Routes ---------- */
+/* ---------- Who's going: counts per festival, never names ---------- */
+const EVENT_ID = /^[a-z0-9][a-z0-9-]{2,79}$/
+const MAX_GOING = 100
+let counts = { rev: -1, value: {} }
+function goingCounts() {
+  if (counts.rev === db.rev) return counts.value
+  const value = {}
+  for (const ids of Object.values(db.goingBy)) for (const id of ids) value[id] = (value[id] ?? 0) + 1
+  counts = { rev: db.rev, value }
+  return value
+}
+
 export async function api(req, res, next) {
   const url = new URL(req.url ?? '/', 'http://x')
   if (!url.pathname.startsWith('/api/')) return next()
@@ -413,6 +426,9 @@ export async function api(req, res, next) {
     if (req.method === 'GET' && path === 'events') {
       return send(res, 200, { events: await edmtrainEvents() })
     }
+
+    // How many people marked each festival. Only totals leave the server.
+    if (req.method === 'GET' && path === 'going') return send(res, 200, { counts: goingCounts() })
 
     // Listing photos load as ordinary pictures, so they cannot carry the secret key. They are public like the listing.
     if (req.method === 'GET' && path.startsWith('photo/')) {
@@ -463,6 +479,19 @@ export async function api(req, res, next) {
         save()
       }
       return send(res, 200, snapshot(me))
+    }
+
+    // The whole list of festivals this person marked, replacing what was there.
+    if (req.method === 'PUT' && path === 'going') {
+      if (!allow(`going:${me}`, 60, MINUTE)) throw new Refuse(429, 'rate_limited')
+      const b = await readBody(req)
+      const ids = Array.isArray(b.ids) ? [...new Set(b.ids.filter((x) => typeof x === 'string' && EVENT_ID.test(x)))].slice(0, MAX_GOING) : []
+      if ((db.goingBy[me] ?? []).join('|') !== ids.join('|')) {
+        if (ids.length) db.goingBy[me] = ids
+        else delete db.goingBy[me]
+        save()
+      }
+      return send(res, 200, { counts: goingCounts() })
     }
 
     if (req.method === 'POST' && path === 'listings') {
