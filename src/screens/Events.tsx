@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckIcon, PinIcon } from '../art'
-import { CITIES, EVENTS_CHECKED, bandColor, bandPrint, dateParts, lastDay, loadEvents, milesBetween, type RaveEvent } from '../events'
+import { CheckIcon, PinIcon, SearchIcon } from '../art'
+import { CITIES, EVENTS_CHECKED, GENRES, bandColor, bandPrint, dateParts, lastDay, loadEvents, milesBetween, type Genre, type RaveEvent } from '../events'
 import { useGoing } from '../going'
 import { PageHeader } from './PageHeader'
 
@@ -28,6 +28,8 @@ export default function Events() {
   const [spot, setSpot] = useState<Spot | null>(() => load<Spot | null>(SPOT_KEY, null))
   const going = useGoing()
   const [radius, setRadius] = useState(150)
+  const [genre, setGenre] = useState<Genre | ''>('')
+  const [query, setQuery] = useState('')
   const [locating, setLocating] = useState(false)
   const [problem, setProblem] = useState('')
 
@@ -62,8 +64,12 @@ export default function Events() {
       .filter((ev) => lastDay(ev) >= today)
       .map((ev) => ({ ev, miles: spot ? milesBetween(spot, ev) : null }))
     const near = spot && radius > 0 ? upcoming.filter((x) => x.miles !== null && x.miles <= radius) : upcoming
-    return near.sort((a, b) => a.ev.date.localeCompare(b.ev.date))
-  }, [events, spot, radius, today])
+    const q = query.trim().toLowerCase()
+    return near
+      .filter((x) => !genre || x.ev.genre === genre)
+      .filter((x) => !q || `${x.ev.name} ${x.ev.city} ${x.ev.place}`.toLowerCase().includes(q))
+      .sort((a, b) => a.ev.date.localeCompare(b.ev.date) || Number(!!a.ev.tba) - Number(!!b.ev.tba))
+  }, [events, spot, radius, today, genre, query])
 
   const [next, ...rest] = list
   const months = useMemo(() => {
@@ -78,22 +84,23 @@ export default function Events() {
   }, [rest])
 
   const renderEvent = ({ ev, miles }: { ev: RaveEvent; miles: number | null }, feature = false) => {
-    const d = dateParts(ev.date, ev.days)
+    const d = dateParts(ev.date, ev.days, ev.tba)
     const isGoing = going.isGoing(ev.id)
+    const away = ev.tba ? 'dates soon' : d.away <= 0 ? 'today' : d.away === 1 ? 'tomorrow' : `in ${d.away} days`
     return (
       <li key={ev.id} className={feature ? 'event event-feature' : 'event'} data-print={bandPrint(ev.id)} style={{ ['--band' as string]: bandColor(ev.id) }}>
         {feature && <div className="event-band" aria-hidden="true">{[0, 1, 2, 3].map((i) => <span key={i}>{ev.name} / {d.range} /</span>)}</div>}
         <div className="event-date" aria-hidden="true">
           <div>
             <span>{d.month}</span>
-            <strong>{String(d.day).padStart(2, '0')}</strong>
+            <strong>{ev.tba ? 'TBA' : String(d.day).padStart(2, '0')}</strong>
             {ev.days > 1 && <small>{ev.days} days</small>}
           </div>
         </div>
         <div className="event-main">
-          {feature && <p className="event-kicker">Next up · {d.away <= 0 ? 'today' : d.away === 1 ? 'tomorrow' : `in ${d.away} days`}</p>}
+          {feature && <p className="event-kicker">Next up · {away}</p>}
           <h3>{ev.name}</h3>
-          <p className="event-when">{d.range}{!feature && <span className="event-away"> · {d.away <= 0 ? 'today' : d.away === 1 ? 'tomorrow' : `in ${d.away} days`}</span>}</p>
+          <p className="event-when">{d.range}{!feature && !ev.tba && <span className="event-away"> · {away}</span>}</p>
           <p className="event-where">
             {ev.place}, {ev.city}
             {miles !== null && <> · <strong>{miles < 1 ? 'in town' : `${Math.round(miles)} miles away`}</strong></>}
@@ -101,7 +108,7 @@ export default function Events() {
           {ev.note && <p className="event-note">{ev.note}</p>}
           {ev.via && <p className="event-note">Listing from {ev.via}</p>}
           <div className="event-actions">
-            <a className="btn" href={ev.url} target="_blank" rel="noopener noreferrer">Dates and tickets</a>
+            <a className="btn" href={ev.url} target="_blank" rel="noopener noreferrer">{ev.tba ? 'Official site' : 'Dates and tickets'}</a>
             <button type="button" className={`btn btn-soft going${isGoing ? ' is-going' : ''}`} aria-pressed={isGoing} onClick={() => going.toggle(ev)}>
               {isGoing && <CheckIcon />} {isGoing ? 'I’m going' : 'Mark as going'}
             </button>
@@ -150,6 +157,20 @@ export default function Events() {
           {problem && <p className="error" role="alert">{problem}</p>}
         </section>
 
+        <section className="event-filters" aria-label="Filter events">
+          <label className="search">
+            <span className="sr-only">Search festivals</span>
+            <SearchIcon />
+            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search a festival or city" />
+          </label>
+          <div className="bubbles" role="group" aria-label="Sound">
+            <button type="button" className="bubble" aria-pressed={!genre} onClick={() => setGenre('')}>All sounds</button>
+            {GENRES.map((g) => (
+              <button key={g.id} type="button" className="bubble" aria-pressed={genre === g.id} onClick={() => setGenre(genre === g.id ? '' : g.id)}>{g.label}</button>
+            ))}
+          </div>
+        </section>
+
         <div className="results-bar" aria-live="polite">
           <p>
             {events === null ? 'Loading events…' : `${list.length} ${list.length === 1 ? 'event' : 'events'}${spot && radius > 0 ? ` within ${radius} miles` : spot ? '' : ' everywhere'}`}
@@ -158,9 +179,9 @@ export default function Events() {
 
         {events !== null && list.length === 0 && (
           <div className="empty">
-            <h2>No events that close yet</h2>
-            <p>Nothing is coming up within {radius} miles of {spot?.label}. Try looking further out.</p>
-            <button type="button" className="btn" onClick={() => setRadius(0)}>Show events anywhere</button>
+            <h2>{genre || query ? 'No festivals match' : 'No events that close yet'}</h2>
+            <p>{genre || query ? 'Try another sound or search, or look further out.' : `Nothing is coming up within ${radius} miles of ${spot?.label}. Try looking further out.`}</p>
+            <button type="button" className="btn" onClick={() => { setRadius(0); setGenre(''); setQuery('') }}>Show every festival</button>
           </div>
         )}
 
@@ -174,7 +195,7 @@ export default function Events() {
         ))}
 
         <p className="fineprint">
-          Dates checked {EVENTS_CHECKED} against each festival’s announcements. They can change, so confirm on the festival’s own page before you buy.
+          Electronic festivals in the US, Canada and Mexico. Dates checked {EVENTS_CHECKED} against each festival’s announcements. Ones marked “dates not announced” are listed under the month they usually happen. Dates can change, so confirm on the festival’s own page before you buy.
           Your location stays on this device.
         </p>
       </main>

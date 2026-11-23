@@ -17,11 +17,11 @@ export function Countdown({ prompt = false }: { prompt?: boolean }) {
   }
 
   const left = daysUntil(ev.date)
-  const d = dateParts(ev.date, ev.days)
-  const big = left > 0 ? String(left) : 'Now'
-  const unit = left === 1 ? 'day to go' : left > 1 ? 'days to go' : left === 0 ? 'Today' : 'On now'
+  const d = dateParts(ev.date, ev.days, ev.tba)
+  const big = ev.tba ? d.month : left > 0 ? String(left) : 'Now'
+  const unit = ev.tba ? 'dates soon' : left === 1 ? 'day to go' : left > 1 ? 'days to go' : left === 0 ? 'Today' : 'On now'
   const more = next.length - 1
-  const label = left > 0 ? `${ev.name} in ${left} ${left === 1 ? 'day' : 'days'}` : `${ev.name} is on now`
+  const label = ev.tba ? `${ev.name}, dates not announced yet` : left > 0 ? `${ev.name} in ${left} ${left === 1 ? 'day' : 'days'}` : `${ev.name} is on now`
 
   return (
     <a className="countdown" href="#/events" data-print={bandPrint(ev.id)} style={{ ['--band' as string]: bandColor(ev.id) }} aria-label={`Your next festival: ${label}`}>
