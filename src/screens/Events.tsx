@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CheckIcon, PinIcon } from '../art'
-import { CITIES, EVENTS_CHECKED, dateParts, loadEvents, milesBetween, type RaveEvent } from '../events'
+import { CITIES, EVENTS_CHECKED, bandColor, dateParts, loadEvents, milesBetween, type RaveEvent } from '../events'
 import { PageHeader } from './PageHeader'
 
 interface Spot { label: string; lat: number; lng: number }
@@ -84,7 +84,8 @@ export default function Events() {
     const d = dateParts(ev.date, ev.days)
     const isGoing = going.includes(ev.id)
     return (
-      <li key={ev.id} className={feature ? 'event event-feature' : 'event'}>
+      <li key={ev.id} className={feature ? 'event event-feature' : 'event'} style={{ ['--band' as string]: bandColor(ev.id) }}>
+        {feature && <div className="event-band" aria-hidden="true">{[0, 1, 2, 3].map((i) => <span key={i}>{ev.name} / {d.range} /</span>)}</div>}
         <div className="event-date" aria-hidden="true">
           <span>{d.month}</span>
           <strong>{String(d.day).padStart(2, '0')}</strong>

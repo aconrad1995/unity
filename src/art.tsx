@@ -124,7 +124,7 @@ export function ListingImage({ listing, index = 0 }: { listing: Listing; index?:
         </pattern>
       </defs>
 
-      <rect className="tile" width="200" height="240" />
+      <rect width="200" height="240" fill={art.bg} />
       <ellipse className="floor" cx="100" cy="214" rx="54" ry="7" />
 
       <g strokeLinejoin="round" strokeLinecap="round">

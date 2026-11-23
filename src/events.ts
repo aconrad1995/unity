@@ -34,7 +34,7 @@ export interface RaveEvent {
   /** ISO date of the first day */
   date: string
   days: number
-  /** Where the dates come from; the festival's own page or press release where we found one. */
+  /** The festival's own website, where the button sends people. Dates were checked against it or a press release. */
   url: string
   /** Shown on the card when the dates are not yet on an official page. */
   note?: string
@@ -50,19 +50,19 @@ const e = (name: string, city: string, place: string, lat: number, lng: number, 
 /** Real festivals with dates announced as of 22 Nov 2026. Add new ones here; keep the source link. */
 export const EVENTS_CHECKED = '22 Nov 2026'
 const EVENTS: RaveEvent[] = [
-  e('Decadence Colorado', 'Denver, CO', 'Colorado Convention Center', 39.7428, -104.9969, '2026-12-30', 2, 'https://www.edmtunes.com/2026/08/20/decadence-colorado-reveals-stacked-lineup-to-close-out-2026/'),
-  e('Forbidden Kingdom', 'Orlando, FL', 'Central Florida Fairgrounds', 28.553, -81.442, '2027-04-23', 3, 'https://press.insomniac.com/blog/forbidden-kingdom-will-return-to-central-florida-fairgrounds-in-2027'),
-  e('EDC Orlando', 'Orlando, FL', 'Tinker Field', 28.54, -81.4036, '2027-11-05', 3, 'https://edmidentity.com/2026/11/10/edc-orlando-2027-dates-tickets/'),
-  e('Tahoe Live', 'Olympic Valley, CA', 'Palisades Tahoe', 39.1969, -120.2358, '2026-12-11', 3, 'https://edmidentity.com/2026/09/15/tahoe-live-2026-lineup/'),
-  e('Countdown NYE', 'San Bernardino, CA', 'NOS Event Center', 34.1083, -117.2898, '2026-12-31', 2, 'https://press.insomniac.com/blog/countdown-nye-will-expand-to-two-days-and-return-to-nos-event-center-for-2026-festival'),
-  e('Ultra Music Festival', 'Miami, FL', 'Bayfront Park', 25.7743, -80.1862, '2027-03-26', 3, 'https://ultramusicfestival.com/tickets/miami/'),
-  e('Ubbi Dubbi', 'Fort Worth, TX', 'Panther Island Pavilion', 32.7634, -97.3363, '2027-04-23', 2, 'https://edmidentity.com/2026/11/04/ubbi-dubbi-2027-lineup/'),
-  e('EDC Las Vegas: Dusk', 'Las Vegas, NV', 'Las Vegas Motor Speedway', 36.2721, -115.0107, '2027-05-14', 3, 'https://press.insomniac.com/blog/edc-las-vegas-introduces-new-dusk-till-dawn-2027-12-day-festival-concept-spanning-two-consecutive-weekends'),
-  e('EDC Las Vegas: Dawn', 'Las Vegas, NV', 'Las Vegas Motor Speedway', 36.2721, -115.0107, '2027-05-21', 3, 'https://press.insomniac.com/blog/edc-las-vegas-introduces-new-dusk-till-dawn-2027-12-day-festival-concept-spanning-two-consecutive-weekends'),
-  e('Lightning in a Bottle', 'Bakersfield, CA', 'Buena Vista Aquatic Recreation Area', 35.1814, -119.3197, '2027-05-26', 5, 'https://edmidentity.com/2026/11/17/lightning-in-a-bottle-2027-lineup/'),
+  e('Decadence Colorado', 'Denver, CO', 'Colorado Convention Center', 39.7428, -104.9969, '2026-12-30', 2, 'https://decadencenye.com'),
+  e('Forbidden Kingdom', 'Orlando, FL', 'Central Florida Fairgrounds', 28.553, -81.442, '2027-04-23', 3, 'https://www.forbiddenkingdomfestival.com'),
+  e('EDC Orlando', 'Orlando, FL', 'Tinker Field', 28.54, -81.4036, '2027-11-05', 3, 'https://orlando.edc.com'),
+  e('Tahoe Live', 'Olympic Valley, CA', 'Palisades Tahoe', 39.1969, -120.2358, '2026-12-11', 3, 'https://tahoelive.net'),
+  e('Countdown NYE', 'San Bernardino, CA', 'NOS Event Center', 34.1083, -117.2898, '2026-12-31', 2, 'https://countdownnye.com'),
+  e('Ultra Music Festival', 'Miami, FL', 'Bayfront Park', 25.7743, -80.1862, '2027-03-26', 3, 'https://ultramusicfestival.com'),
+  e('Ubbi Dubbi', 'Fort Worth, TX', 'Panther Island Pavilion', 32.7634, -97.3363, '2027-04-23', 2, 'https://ubbidubbifestival.com'),
+  e('EDC Las Vegas: Dusk', 'Las Vegas, NV', 'Las Vegas Motor Speedway', 36.2721, -115.0107, '2027-05-14', 3, 'https://lasvegas.edc.com'),
+  e('EDC Las Vegas: Dawn', 'Las Vegas, NV', 'Las Vegas Motor Speedway', 36.2721, -115.0107, '2027-05-21', 3, 'https://lasvegas.edc.com'),
+  e('Lightning in a Bottle', 'Bakersfield, CA', 'Buena Vista Aquatic Recreation Area', 35.1814, -119.3197, '2027-05-26', 5, 'https://www.libfestival.org'),
   e('Movement Detroit', 'Detroit, MI', 'Hart Plaza', 42.3282, -83.0446, '2027-05-29', 3, 'https://movementfestival.com', 'Dates come from ticket listings. Check the official site.'),
-  e('Beyond Wonderland Midwest', 'Joliet, IL', 'Chicagoland Speedway', 41.4767, -88.0553, '2027-06-11', 3, 'https://press.insomniac.com/blog/beyond-wonderland-midwest-expands-to-three-days-debuts-new-venue-for-2027-edition'),
-  e('Escape Psycho Circus', 'San Bernardino, CA', 'NOS Event Center', 34.1083, -117.2898, '2027-10-29', 2, 'https://edmidentity.com/2026/11/03/escape-psycho-circus-2027-dates-tickets/'),
+  e('Beyond Wonderland Midwest', 'Joliet, IL', 'Chicagoland Speedway', 41.4767, -88.0553, '2027-06-11', 3, 'https://midwest.beyondwonderland.com'),
+  e('Escape Halloween', 'San Bernardino, CA', 'NOS Event Center', 34.1083, -117.2898, '2027-10-29', 2, 'https://escapehalloween.com'),
 ]
 
 const words = (x: string) => x.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter((w) => w.length > 2)
@@ -73,6 +73,10 @@ const sameEvent = (a: RaveEvent, b: RaveEvent) => {
 }
 
 /** The hand-checked list, plus whatever EDMTrain has when the server holds a key. Our own entries win on a match. */
+/** Each event gets its own wristband color, the way a festival picks a new one every year. */
+const BANDS = ['#ff2e93', '#ffd93d', '#8fb4ff', '#7de8c0', '#c3a8ff', '#ff9d4d']
+export const bandColor = (id: string) => BANDS[[...id].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7) % BANDS.length]
+
 export async function loadEvents(): Promise<RaveEvent[]> {
   let extra: RaveEvent[] = []
   try {
