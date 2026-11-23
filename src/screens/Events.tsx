@@ -72,17 +72,37 @@ export default function Events() {
       .sort((a, b) => a.ev.date.localeCompare(b.ev.date) || Number(!!a.ev.tba) - Number(!!b.ev.tba))
   }, [events, spot, radius, today, genre, query])
 
-  const [next, ...rest] = list
-  const months = useMemo(() => {
-    const groups: { label: string; items: typeof list }[] = []
-    for (const item of rest) {
-      const label = new Date(`${item.ev.date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  // A year of festivals is a long wall, so the page opens on the next few months and a chip row jumps to any month.
+  const [month, setMonth] = useState('')
+  const [showAll, setShowAll] = useState(false)
+  const byMonth = useMemo(() => {
+    const groups: { label: string; short: string; items: typeof list }[] = []
+    const thisYear = new Date().getFullYear()
+    for (const item of list) {
+      const at = new Date(`${item.ev.date}T12:00:00`)
+      const label = at.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
       const last = groups[groups.length - 1]
       if (last && last.label === label) last.items.push(item)
-      else groups.push({ label, items: [item] })
+      else groups.push({ label, short: at.getFullYear() === thisYear ? at.toLocaleDateString('en-US', { month: 'short' }) : at.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }).replace(' ', ' ’'), items: [item] })
     }
     return groups
-  }, [rest])
+  }, [list])
+  useEffect(() => {
+    if (month && !byMonth.some((m) => m.label === month)) setMonth('')
+  }, [month, byMonth])
+
+  const picked = byMonth.find((m) => m.label === month)
+  // With a month picked there's no "next up" card: just that month.
+  const next = picked ? undefined : list[0]
+  const months = picked
+    ? [picked]
+    : byMonth
+        .map((m) => ({ ...m, items: m.items.filter((x) => x !== next) }))
+        .filter((m) => m.items.length > 0)
+  const capped = !picked && !showAll && !query.trim()
+  const shown = capped ? months.slice(0, 3) : months
+  const later = months.slice(shown.length)
+  const laterCount = later.reduce((n, m) => n + m.items.length, 0)
 
   const renderEvent = ({ ev, miles }: { ev: RaveEvent; miles: number | null }, feature = false) => {
     const d = dateParts(ev.date, ev.days, ev.tba)
@@ -179,9 +199,21 @@ export default function Events() {
           </div>
         </section>
 
+        {byMonth.length > 1 && (
+          <div className="bubbles month-row" role="group" aria-label="Month">
+            <button type="button" className="bubble" aria-pressed={!month} onClick={() => setMonth('')}>All months</button>
+            {byMonth.map((m) => (
+              <button key={m.label} type="button" className="bubble" aria-pressed={month === m.label} aria-label={`${m.label}, ${m.items.length} ${m.items.length === 1 ? 'festival' : 'festivals'}`}
+                onClick={() => setMonth(month === m.label ? '' : m.label)}>
+                {m.short}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="results-bar" aria-live="polite">
           <p>
-            {events === null ? 'Loading events…' : `${list.length} ${list.length === 1 ? 'event' : 'events'}${spot && radius > 0 ? ` within ${radius} miles` : spot ? '' : ' everywhere'}`}
+            {events === null ? 'Loading events…' : picked ? `${picked.items.length} ${picked.items.length === 1 ? 'event' : 'events'} in ${picked.label.split(' ')[0]}` : `${list.length} ${list.length === 1 ? 'event' : 'events'}${spot && radius > 0 ? ` within ${radius} miles` : spot ? '' : ' everywhere'}`}
           </p>
         </div>
 
@@ -195,12 +227,23 @@ export default function Events() {
 
         {next && <ul className="events events-lead">{renderEvent(next, true)}</ul>}
 
-        {months.map((m) => (
+        {shown.map((m) => (
           <section key={m.label} className="month" aria-label={m.label}>
             <h2 className="month-h">{m.label}</h2>
             <ul className="events">{m.items.map((x) => renderEvent(x))}</ul>
           </section>
         ))}
+
+        {laterCount > 0 && (
+          <button type="button" className="btn btn-soft btn-wide events-more" onClick={() => setShowAll(true)}>
+            Show {laterCount} more {laterCount === 1 ? 'festival' : 'festivals'}, {later[0].label.split(' ')[1] === later[later.length - 1].label.split(' ')[1] ? later[0].label.split(' ')[0] : later[0].label} to {later[later.length - 1].label}
+          </button>
+        )}
+        {picked && (
+          <button type="button" className="btn btn-soft btn-wide events-more" onClick={() => { setMonth(''); window.scrollTo(0, 0) }}>
+            See every month
+          </button>
+        )}
 
         <p className="fineprint">
           Electronic festivals in the US, Canada and Mexico. Dates checked {EVENTS_CHECKED} against each festival’s announcements. Ones marked “dates not announced” are listed under the month they usually happen. Dates can change, so confirm on the festival’s own page before you buy.

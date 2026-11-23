@@ -498,8 +498,9 @@ select:focus-visible, .field input:focus-visible, .field textarea:focus-visible 
 .team-box { display: grid; gap: 12px; }
 
 /* ---------- Events: wristband tickets ---------- */
-.where-row { display: grid; gap: 12px; align-items: end; }
-@media (min-width: 640px) { .where-row { grid-template-columns: auto minmax(0, 1fr) 180px; } }
+.where-row { display: grid; grid-template-columns: minmax(0, 1fr) 128px; gap: 12px; align-items: end; }
+.where-row > .btn { grid-column: 1 / -1; }
+@media (min-width: 640px) { .where-row { grid-template-columns: auto minmax(0, 1fr) 180px; } .where-row > .btn { grid-column: auto; } }
 .where .btn { gap: 8px; }
 .where .error { margin-top: 10px; }
 .btn:disabled { opacity: 0.6; cursor: default; transform: none; }
@@ -509,6 +510,8 @@ select:disabled { opacity: 0.55; }
 .events { display: grid; gap: 12px; }
 @media (min-width: 760px) { .events:not(.events-lead) { grid-template-columns: 1fr 1fr; gap: 16px; } }
 .month { margin-top: 32px; }
+.month-row { margin-top: -4px; }
+.events-more { margin-top: 24px; }
 .month-h { font: 800 1.75rem/1 var(--wide); font-stretch: 75%; text-transform: uppercase; margin: 0 0 16px; padding-bottom: 12px; background: var(--stitch) 0 100% / 10px 2px repeat-x; background-color: transparent; background-image: repeating-linear-gradient(90deg, var(--ink) 0 6px, transparent 6px 12px); background-size: 100% 2px; background-repeat: no-repeat; background-position: 0 100%; }
 .event { --band: var(--pink-hot); position: relative; display: grid; grid-template-columns: 88px minmax(0, 1fr); background: var(--cloud); border: var(--line); border-radius: var(--r-card); overflow: hidden; }
 /* the stub: the event's own band color, torn off along a perforation */
