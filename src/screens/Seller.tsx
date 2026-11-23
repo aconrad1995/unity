@@ -70,7 +70,7 @@ export function SellerPage({ store, id }: { store: Store; id: string }) {
 
   return (
     <>
-      <PageHeader title={isMe ? 'Your seller page' : name} />
+      <PageHeader title={isMe ? 'Your seller page' : name} heading={false} docTitle={name} />
       <main className="page seller-page">
         <section className="seller-head">
           <Avatar profile={person} size={88} />

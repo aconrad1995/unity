@@ -431,12 +431,44 @@ export function useStore() {
 export type Store = ReturnType<typeof useStore>
 
 /** Tiny hash router: "#/", "#/item/abc", "#/sell", "#/saved". */
+/* Scroll memory: each history entry gets a number, and its scroll position is kept under it, so Back
+   from an outfit lands where you were in the shop. A new page starts at the top. */
+const scrollAt = new Map<number, number>()
+let entry = 0
+let entries = 0
+function entryOf(state: unknown): number | undefined {
+  return state && typeof state === 'object' && typeof (state as { unityEntry?: unknown }).unityEntry === 'number' ? (state as { unityEntry: number }).unityEntry : undefined
+}
+function stamp(): boolean {
+  const known = entryOf(window.history.state)
+  if (known !== undefined) { entry = known; entries = Math.max(entries, known); return false }
+  entry = ++entries
+  try { window.history.replaceState({ ...(window.history.state ?? {}), unityEntry: entry }, '') } catch { /* fine */ }
+  return true
+}
+if (typeof window !== 'undefined') {
+  if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual'
+  stamp()
+  window.addEventListener('scroll', () => { scrollAt.set(entry, window.scrollY) }, { passive: true })
+}
+
 export function useRoute(): string[] {
   const [hash, setHash] = useState(() => window.location.hash)
   useEffect(() => {
     const onChange = () => {
+      // The page hasn't re-rendered yet, so this is still where the outgoing page was scrolled.
+      scrollAt.set(entry, window.scrollY)
+      const fresh = stamp()
       setHash(window.location.hash)
-      window.scrollTo(0, 0)
+      const y = fresh ? 0 : scrollAt.get(entry) ?? 0
+      // Wait for the new page to render before scrolling, then point screen readers at its heading.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        window.scrollTo(0, y)
+        if (fresh) {
+          const h = document.querySelector<HTMLElement>('main h1, header h1, h1')
+          if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }) }
+        }
+      }))
     }
     window.addEventListener('hashchange', onChange)
     return () => window.removeEventListener('hashchange', onChange)

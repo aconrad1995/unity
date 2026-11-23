@@ -66,7 +66,7 @@ export default function ListingPage({ store, id }: { store: Store; id: string })
 
   return (
     <>
-      <PageHeader title={listing.brand} />
+      <PageHeader title={listing.brand} heading={false} docTitle={`${listing.title}, ${listing.brand}`} />
       <main className="page detail">
         {justListed && (
           <div className="success listed-next" role="status">

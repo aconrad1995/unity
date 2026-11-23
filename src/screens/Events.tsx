@@ -111,7 +111,7 @@ export default function Events() {
           {ev.via && <p className="event-note">Listing from {ev.via}</p>}
           {/* Unity's own job comes first: outfits that land before the festival. Inside 6 days nothing can ship in time. */}
           {!ev.tba && !ev.via && d.away > 6 && (
-            <a className="btn btn-wide event-shop" href={`#/shop-for/${encodeURIComponent(ev.id)}`}>
+            <a className={`btn btn-wide event-shop${feature ? '' : ' btn-soft'}`} href={`#/shop-for/${encodeURIComponent(ev.id)}`}>
               Shop fits that arrive by {new Date(`${ev.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </a>
           )}
