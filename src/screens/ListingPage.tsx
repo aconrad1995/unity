@@ -40,15 +40,21 @@ export default function ListingPage({ store, id }: { store: Store; id: string })
   }, [listing?.id])
 
   if (!listing) {
+    // Until the first sync answers, a shared link hasn't been checked yet, so don't call it gone.
+    const state = store.online === null ? 'loading' : store.online === false ? 'offline' : 'gone'
     return (
       <>
-        <PageHeader title="Outfit not found" />
+        <PageHeader title={state === 'gone' ? 'Outfit not found' : 'Outfit'} />
         <main className="page">
-          <div className="empty">
-            <h2>This outfit is gone</h2>
-            <p>It may have been removed. There is plenty more to see in the shop.</p>
-            <a className="btn" href="#/">Back to the shop</a>
-          </div>
+          {state === 'loading' ? (
+            <p className="loading" role="status">Loading this outfit</p>
+          ) : (
+            <div className="empty">
+              <h2>{state === 'offline' ? 'This outfit can’t load right now' : 'This outfit is gone'}</h2>
+              <p>{state === 'offline' ? `${APP_NAME} can’t be reached. Check your connection, and it will load by itself.` : 'It may have been removed. There is plenty more to see in the shop.'}</p>
+              <a className="btn" href="#/">Back to the shop</a>
+            </div>
+          )}
         </main>
       </>
     )
@@ -146,7 +152,10 @@ export default function ListingPage({ store, id }: { store: Store; id: string })
               ) : listing.ownerId ? (
                 <>
                   {/* Paying inside the app isn't switched on yet, so buying starts as a chat with the seller. */}
-                  <a className="btn btn-wide" href={`#/chats/${listing.ownerId}/${listing.id}`}>Message seller to buy</a>
+                  <div className="buy-row">
+                    <a className="btn" href={`#/chats/${listing.ownerId}/${listing.id}`}>Message seller to buy</a>
+                    <SaveButton store={store} id={listing.id} big />
+                  </div>
                   <p className="buy-how">You’ll agree the price and shipping in the chat. {APP_NAME} doesn’t take payment yet, so pay with something that has buyer protection, like PayPal Goods &amp; Services.</p>
                 </>
               ) : (
@@ -155,7 +164,7 @@ export default function ListingPage({ store, id }: { store: Store; id: string })
                   <a className="btn btn-wide" href="#/sell">List yours in 2 minutes</a>
                 </div>
               )}
-              {!listing.sample && (
+              {!listing.sample && (!listing.ownerId || listing.status === 'sold') && (
                 <div className="actions-row">
                   <SaveButton store={store} id={listing.id} big />
                 </div>

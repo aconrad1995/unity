@@ -15,7 +15,7 @@ export function AccountPage({ store }: { store: Store }) {
         {store.account ? <SignedIn store={store} /> : (
           <>
             <div className="seg" role="tablist" aria-label="Account">
-              <button type="button" role="tab" aria-selected={mode === 'create'} onClick={() => setMode('create')}>Create an account</button>
+              <button type="button" role="tab" aria-selected={mode === 'create'} onClick={() => setMode('create')}>Create account</button>
               <button type="button" role="tab" aria-selected={mode === 'signin'} onClick={() => setMode('signin')}>Sign in</button>
             </div>
             {mode === 'create' ? <CreateForm store={store} /> : <SignInForm store={store} />}

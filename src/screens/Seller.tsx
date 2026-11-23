@@ -49,15 +49,20 @@ export function SellerPage({ store, id }: { store: Store; id: string }) {
   const known = !!store.people[id] || theirs.length > 0
 
   if (!/^[0-9a-f]{16}$/.test(id) || !known) {
+    const waiting = /^[0-9a-f]{16}$/.test(id) && store.online !== true
     return (
       <>
         <PageHeader title="Seller" />
         <main className="page">
-          <div className="empty">
-            <h2>Seller not found</h2>
-            <p>This person may have left {APP_NAME}.</p>
-            <a className="btn" href="#/">Back to the shop</a>
-          </div>
+          {waiting && store.online === null ? (
+            <p className="loading" role="status">Loading this seller</p>
+          ) : (
+            <div className="empty">
+              <h2>{waiting ? 'This seller can’t load right now' : 'Seller not found'}</h2>
+              <p>{waiting ? `${APP_NAME} can’t be reached. Check your connection, and it will load by itself.` : `This person may have left ${APP_NAME}.`}</p>
+              <a className="btn" href="#/">Back to the shop</a>
+            </div>
+          )}
         </main>
       </>
     )

@@ -13,17 +13,12 @@ function when(at: number): string {
   return d.toDateString() === new Date().toDateString() ? time : `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`
 }
 
-function Offline() {
-  return <p className="error" role="alert">{APP_NAME} can’t be reached right now, so chats can’t load. Check your connection.</p>
-}
-
 export function ChatList({ store }: { store: Store }) {
   const nameless = !readProfile().name.trim()
   return (
     <>
       <PageHeader title="Chats" noBack />
       <main className="page chats">
-        {store.online === false && <Offline />}
         {nameless && store.chats.length > 0 && (
           <p className="notice">People see you as “Someone new”. <a className="inline-link" href="#/you">Add your name</a></p>
         )}
@@ -120,7 +115,6 @@ export function ChatThread({ store, user, listingId }: { store: Store; user: str
     <>
       <PageHeader title={name} back="#/chats" backLabel="Back to chats" />
       <main className="page thread">
-        {store.online === false && <Offline />}
 
         {(() => {
           const sells = store.listings.some((l) => l.ownerId === user)
