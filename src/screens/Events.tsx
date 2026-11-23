@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckIcon, PinIcon, SearchIcon } from '../art'
+import { CheckIcon, ExternalIcon, PinIcon, PlusIcon, SearchIcon } from '../art'
 import { CITIES, EVENTS_CHECKED, GENRES, bandColor, bandPrint, dateParts, lastDay, loadEvents, milesBetween, type Genre, type RaveEvent } from '../events'
 import { goingLabel, useGoing, useGoingCounts } from '../going'
 import { PageHeader } from './PageHeader'
@@ -109,13 +109,18 @@ export default function Events() {
           {goingLabel(counts[ev.id], isGoing) && <p className="event-crowd">{goingLabel(counts[ev.id], isGoing)}</p>}
           {ev.note && <p className="event-note">{ev.note}</p>}
           {ev.via && <p className="event-note">Listing from {ev.via}</p>}
+          {/* Unity's own job comes first: outfits that land before the festival. Inside 6 days nothing can ship in time. */}
+          {!ev.tba && !ev.via && d.away > 6 && (
+            <a className="btn btn-wide event-shop" href={`#/shop-for/${encodeURIComponent(ev.id)}`}>
+              Shop fits that arrive by {new Date(`${ev.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </a>
+          )}
           <div className="event-actions">
-            <a className="btn" href={ev.url} target="_blank" rel="noopener noreferrer">{ev.tba ? 'Official site' : 'Dates and tickets'}</a>
             <button type="button" className={`btn btn-soft going${isGoing ? ' is-going' : ''}`} aria-pressed={isGoing} onClick={() => going.toggle(ev)}>
-              {isGoing && <CheckIcon />} {isGoing ? 'I’m going' : 'Mark as going'}
+              {isGoing ? <CheckIcon /> : <PlusIcon />} {isGoing ? 'Going' : 'I’m going'}
             </button>
+            <a className="btn btn-soft event-tickets" href={ev.url} target="_blank" rel="noopener noreferrer">{ev.tba ? 'Official site' : 'Tickets'} <ExternalIcon /><span className="sr-only"> (opens a new tab)</span></a>
           </div>
-          {!ev.tba && !ev.via && d.away > 6 && <a className="link-btn event-shop" href={`#/shop-for/${encodeURIComponent(ev.id)}`}>Find a fit that arrives in time</a>}
         </div>
       </li>
     )

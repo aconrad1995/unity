@@ -1,5 +1,5 @@
 import { HeartIcon, ListingImage } from '../art'
-import { conditionLabel, type Listing } from '../data'
+import { arrivesBy, conditionLabel, type Listing } from '../data'
 import type { Store } from '../store'
 import { noteListing } from '../taste'
 
@@ -27,13 +27,13 @@ export function SaveButton({ store, id, big }: { store: Store; id: string; big?:
 }
 
 export function Card({ listing, store }: { listing: Listing; store: Store }) {
+  const by = listing.status !== 'sold' ? arrivesBy(listing) : null
   return (
     <li className="card">
       <a href={`#/item/${listing.id}`} className="card-link">
         <div className="card-photo">
           <ListingImage listing={listing} />
           <span className="price-bubble">${listing.price}</span>
-          {listing.sample && <span className="sample-flag">Sample</span>}
           {listing.status && <span className={`status-flag status-${listing.status}`}>{listing.status === 'sold' ? 'Sold' : 'Reserved'}</span>}
         </div>
         <div className="card-body">
@@ -44,6 +44,7 @@ export function Card({ listing, store }: { listing: Listing; store: Store }) {
             <span className="size-pill">{listing.size}</span>
             <span className={`cond cond-${listing.condition}`}>{conditionLabel(listing.condition)}</span>
           </p>
+          {by && <p className="card-arrives">Arrives by {by.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</p>}
         </div>
       </a>
       {listing.ownerId !== store.me && <SaveButton store={store} id={listing.id} />}

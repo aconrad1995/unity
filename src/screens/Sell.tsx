@@ -246,7 +246,7 @@ export default function Sell({ store, wornFrom }: { store: Store; wornFrom?: str
               <span>Price in dollars</span>
               <span className="price-input">
                 <span aria-hidden="true">$</span>
-                <input inputMode="decimal" value={price} onChange={(e) => { setPrice(cleanPrice(e.target.value)); fixed('price') }} placeholder="30" maxLength={7} />
+                <input inputMode="decimal" value={price} onChange={(e) => { setPrice(cleanPrice(e.target.value)); fixed('price') }} placeholder="e.g. 30" maxLength={7} />
               </span>
             </label>
             <span className="hint">Whole dollars work best. Cents are rounded, so $45.50 lists as $46.</span>

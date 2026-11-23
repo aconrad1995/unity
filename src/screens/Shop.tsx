@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BellIcon, CameraIcon, HeartIcon, SearchIcon } from '../art'
 import type { Alerts } from '../alerts'
-import { APP_NAME, CATEGORIES, FEATURED, SIZES, arrivesBefore, conditionLabel, featuredFor } from '../data'
+import { APP_NAME, CATEGORIES, FEATURED, SIZES, arrivesBefore, arrivesBy, conditionLabel, featuredFor, type Listing } from '../data'
 import { useGoing } from '../going'
-import { dateParts, findEvent } from '../events'
+import { findEvent } from '../events'
 import { bumpStat, readProfile, type Store } from '../store'
 import { hasSignals, note, noteSearch, readTaste, score } from '../taste'
 import { Card } from './Card'
@@ -15,17 +15,18 @@ export default function Shop({ store, alerts, initialBrand = '', forEvent }: { s
   const [query, setQuery] = useState('')
   const [brand, setBrand] = useState(initialBrand)
   const [category, setCategory] = useState('')
-  const [size, setSize] = useState('')
+  // Shoppers who saved their sizes on You start with just those.
+  const [profile] = useState(readProfile)
+  const [size, setSize] = useState(profile.sizes.length > 0 ? 'mine' : '')
   // With a festival marked, shoppers can keep only what should arrive before it.
   // A festival picked from Events ("Find a fit") wins over the next one on your list.
   const picked = forEvent ? findEvent(forEvent) : undefined
   const goingNext = useGoing().nextDated
   const nextFest = picked && !picked.tba ? picked : goingNext
-  const [inTime, setInTime] = useState(!!picked && !picked.tba)
-  const timeFilter = inTime && nextFest ? nextFest : undefined
+  const [arrive, setArrive] = useState<'' | 'week' | 'fortnight' | 'fest'>(picked && !picked.tba ? 'fest' : '')
+  const timeFilter = arrive === 'fest' && nextFest ? nextFest : undefined
   // What this shopper is into, read once per visit so the order doesn't jump while they browse.
   const [taste] = useState(readTaste)
-  const [profile] = useState(readProfile)
   const personal = hasSignals(taste, profile)
   const [sort, setSort] = useState<Sort>(personal ? 'you' : 'new')
 
@@ -61,8 +62,12 @@ export default function Shop({ store, alerts, initialBrand = '', forEvent }: { s
     const out = store.listings.filter((l) => {
       if (brand && l.brand !== brand) return false
       if (category && l.category !== category) return false
-      if (size && l.size !== size) return false
+      if (size === 'mine' ? !(profile.sizes.includes(l.size) || l.size === 'One size') : size && l.size !== size) return false
       if (timeFilter && !arrivesBefore(l, timeFilter.date)) return false
+      if (arrive === 'week' || arrive === 'fortnight') {
+        const by = arrivesBy(l)
+        if (!by || by.getTime() > Date.now() + (arrive === 'week' ? 7 : 14) * 86_400_000) return false
+      }
       const hay = `${l.title} ${l.brand} ${l.category} ${l.size} ${conditionLabel(l.condition)} ${l.description} ${l.wornAt ?? ''}`.toLowerCase()
       return words.every((w) => hay.includes(w))
     })
@@ -71,16 +76,19 @@ export default function Shop({ store, alerts, initialBrand = '', forEvent }: { s
     else if (sort === 'high') out.sort((a, b) => b.price - a.price)
     else out.sort((a, b) => b.createdAt - a.createdAt)
     return out
-  }, [store.listings, query, brand, category, size, sort, taste, profile, timeFilter])
+  }, [store.listings, query, brand, category, size, sort, taste, profile, timeFilter, arrive])
 
-  const filtered = Boolean(query || brand || category || size || timeFilter)
+  const filtered = Boolean(query || brand || category || size || arrive)
   const clear = () => {
     setQuery('')
     setBrand('')
     setCategory('')
     setSize('')
-    setInTime(false)
+    setArrive('')
   }
+  // Real outfits first. Samples only fill the shop until there is real stock, under their own heading.
+  const real = results.filter((l) => !l.sample)
+  const samples = results.filter((l) => l.sample)
 
   return (
     <>
@@ -118,43 +126,63 @@ export default function Shop({ store, alerts, initialBrand = '', forEvent }: { s
       <main className="page">
         <BackFrom />
         <Countdown />
-        <InspoStrip store={store} />
-        <section aria-labelledby="brands-h">
-          <h2 id="brands-h" className="row-h">Shop by brand</h2>
-          <div className="bubbles" role="group" aria-label="Brand">
-            <button type="button" className="bubble" aria-pressed={brand === ''} onClick={() => setBrand('')}>All brands</button>
-            {brandRow.map((b) => {
-              const isFeatured = Boolean(featuredFor(b))
-              return (
-                <button
-                  key={b}
-                  type="button"
-                  className={`bubble${isFeatured ? ' bubble-featured' : ''}`}
-                  aria-pressed={brand === b}
-                  aria-label={isFeatured ? `${b}, featured brand` : undefined}
-                  onClick={() => {
-                    if (brand !== b) note('brands', b)
-                    setBrand(brand === b ? '' : b)
-                  }}
-                >
-                  {b}
-                </button>
-              )
-            })}
-          </div>
-        </section>
-
-        <section aria-labelledby="type-h">
-          <h2 id="type-h" className="row-h">What are you looking for?</h2>
-          <div className="bubbles" role="group" aria-label="Type">
-            <button type="button" className="bubble" aria-pressed={category === ''} onClick={() => setCategory('')}>Everything</button>
-            {CATEGORIES.map((c) => (
-              <button key={c} type="button" className="bubble" aria-pressed={category === c} onClick={() => { if (category !== c) note('categories', c); setCategory(category === c ? '' : c) }}>
-                {c}
+        <div className="bubbles brand-row" role="group" aria-label="Brand">
+          <button type="button" className="bubble" aria-pressed={brand === ''} onClick={() => setBrand('')}>All brands</button>
+          {brandRow.map((b) => {
+            const isFeatured = Boolean(featuredFor(b))
+            return (
+              <button
+                key={b}
+                type="button"
+                className={`bubble${isFeatured ? ' bubble-featured' : ''}`}
+                aria-pressed={brand === b}
+                aria-label={isFeatured ? `${b}, featured brand` : undefined}
+                onClick={() => {
+                  if (brand !== b) note('brands', b)
+                  setBrand(brand === b ? '' : b)
+                }}
+              >
+                {b}
               </button>
-            ))}
-          </div>
-        </section>
+            )
+          })}
+        </div>
+
+        <div className="filter-row">
+          <label className={`chip-select${category ? ' is-set' : ''}`}>
+            <span className="sr-only">Type</span>
+            <select value={category} onChange={(e) => { if (e.target.value) note('categories', e.target.value); setCategory(e.target.value) }}>
+              <option value="">All types</option>
+              {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+            </select>
+          </label>
+          <label className={`chip-select${size ? ' is-set' : ''}`}>
+            <span className="sr-only">Size</span>
+            <select value={size} onChange={(e) => { if (e.target.value && e.target.value !== 'mine') note('sizes', e.target.value); setSize(e.target.value) }}>
+              <option value="">Any size</option>
+              {profile.sizes.length > 0 && <option value="mine">My sizes ({profile.sizes.join(', ')})</option>}
+              {SIZES.map((s) => <option key={s} value={s}>Size {s}</option>)}
+            </select>
+          </label>
+          <label className={`chip-select${arrive ? ' is-set' : ''}`}>
+            <span className="sr-only">Arrives</span>
+            <select value={arrive} onChange={(e) => setArrive(e.target.value as typeof arrive)}>
+              <option value="">Arrives any time</option>
+              {nextFest && <option value="fest">Before {nextFest.name}</option>}
+              <option value="week">Within a week</option>
+              <option value="fortnight">Within 2 weeks</option>
+            </select>
+          </label>
+          <label className="chip-select">
+            <span className="sr-only">Sort</span>
+            <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
+              <option value="you">Picked for you</option>
+              <option value="new">Newest first</option>
+              <option value="low">Price: low to high</option>
+              <option value="high">Price: high to low</option>
+            </select>
+          </label>
+        </div>
 
         {featured && (
           <aside className="brand-banner" aria-label={`Sponsored: ${featured.brand}`}>
@@ -174,70 +202,49 @@ export default function Shop({ store, alerts, initialBrand = '', forEvent }: { s
           </aside>
         )}
 
-        <div className="selects">
-          <label className="field-inline">
-            <span>Size</span>
-            <select value={size} onChange={(e) => { note('sizes', e.target.value); setSize(e.target.value) }}>
-              <option value="">Any size</option>
-              {SIZES.map((s) => <option key={s}>{s}</option>)}
-            </select>
-          </label>
-          <label className="field-inline">
-            <span>Sort</span>
-            <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-              <option value="you">Picked for you</option>
-              <option value="new">Newest first</option>
-              <option value="low">Price: low to high</option>
-              <option value="high">Price: high to low</option>
-            </select>
-          </label>
-        </div>
-
-        {nextFest && (
-          <button type="button" className="in-time" aria-pressed={inTime} onClick={() => setInTime(!inTime)}>
-            <span className="in-time-box" aria-hidden="true" />
-            <span>
-              <strong>Arrives before {nextFest.name}</strong>
-              <span>Only outfits that should reach you before {dateParts(nextFest.date, 1).range}</span>
-            </span>
-          </button>
-        )}
-
         <div className="results-bar" aria-live="polite">
-          <p>{results.length} {results.length === 1 ? 'outfit' : 'outfits'}{brand ? ` from ${brand}` : ''}</p>
+          <p>{real.length === 0 ? 'Nothing for sale yet' : `${real.length} ${real.length === 1 ? 'outfit' : 'outfits'}${brand ? ` from ${brand}` : ''}`}</p>
           {filtered && <button type="button" className="link-btn" onClick={clear}>Clear filters</button>}
         </div>
 
-        {sort === 'you' && results.length > 0 && (
-          <p className="for-you">
-            {personal
-              ? 'Best matches first, based on your searches, taps and profile.'
-              : 'Search, tap brands or fill in your profile and your best matches will show first.'}
-          </p>
+        {real.length > 0 && <Grid items={real.slice(0, 4)} store={store} />}
+        {real.length > 0 && <InspoStrip store={store} />}
+        {real.length > 4 && <Grid items={real.slice(4)} store={store} />}
+
+        {samples.length > 0 && (
+          <section className="samples" aria-labelledby="samples-h">
+            <div className="samples-head">
+              <h2 id="samples-h">Real outfits land here first</h2>
+              <p>Until then, these examples show how a listing looks. None of them are for sale.</p>
+              <a className="btn btn-soft" href="#/alerts">Tell me when my size is listed</a>
+            </div>
+            <Grid items={samples.slice(0, 4)} store={store} />
+            {real.length === 0 && <InspoStrip store={store} />}
+            {samples.length > 4 && <Grid items={samples.slice(4)} store={store} />}
+          </section>
         )}
 
-        {results.length > 0 ? (
-          <ul className="grid">
-            {results.map((l) => <Card key={l.id} listing={l} store={store} />)}
-          </ul>
-        ) : (
+        {results.length === 0 && (
           <div className="empty">
             <h2>Nothing matches yet</h2>
-            <p>{timeFilter
-              ? `Nothing is sure to arrive before ${timeFilter.name} yet. Some sellers haven’t said how fast they ship, so it’s worth messaging them to ask.`
+            <p>{timeFilter || arrive
+              ? `Nothing is sure to arrive ${timeFilter ? `before ${timeFilter.name}` : 'that soon'} yet. Some sellers haven’t said how fast they ship, so it’s worth messaging them to ask.`
               : 'Try a different brand or size, or clear your filters to see everything.'}</p>
             <button type="button" className="btn" onClick={clear}>Show all outfits</button>
           </div>
         )}
 
         <p className="fineprint">
-          Outfits are listed by real people. Any marked “Sample” are made-up examples that fill the shop
-          until there’s more real stock. {APP_NAME} is not affiliated with the brands listed.
+          Outfits are listed by real people. {APP_NAME} is not affiliated with the brands listed.
         </p>
         <a className="btn btn-soft btn-wide" href="#/for-brands">Run a rave brand? Feature it on {APP_NAME}</a>
       </main>
     </>
   )
+}
+
+function Grid({ items, store }: { items: Listing[]; store: Store }) {
+  return <ul className="grid">{items.map((l) => <Card key={l.id} listing={l} store={store} />)}</ul>
 }
 
 /** A small doorway to Inspo at the top of the shop: the fit of the week when there is one. */

@@ -25,6 +25,7 @@ export const StarIcon = ({ filled }: { filled?: boolean }) => (
   <Icon fill={filled ? 'currentColor' : 'none'}><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5Z" /></Icon>
 )
 export const InstagramIcon = () => <Icon><rect x="4" y="4" width="16" height="16" rx="5" /><circle cx="12" cy="12" r="3.6" /><circle cx="17" cy="7" r="0.6" fill="currentColor" /></Icon>
+export const ExternalIcon = () => <Icon><path d="M14 5h5v5M19 5l-8 8M17 14v5H5V7h5" /></Icon>
 export const CheckIcon = () => <Icon strokeWidth={2.6}><path d="m5 12 5 5 9-10" /></Icon>
 export const HeartIcon = ({ filled }: { filled?: boolean }) => (
   <Icon fill={filled ? 'currentColor' : 'none'}>

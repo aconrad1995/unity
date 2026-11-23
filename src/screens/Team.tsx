@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { CheckIcon } from '../art'
-import { APP_NAME } from '../data'
-import { NO_ONE, nameOf, type Report, type Role, type Store } from '../store'
+import { APP_NAME, FEATURED } from '../data'
+import { NO_ONE, nameOf, readStats, type Report, type Role, type Store } from '../store'
 import { PageHeader } from './PageHeader'
 
 const ROLE_LABEL: Record<Exclude<Role, ''>, string> = { owner: 'Shop owner', admin: `${APP_NAME} team` }
@@ -45,7 +45,33 @@ export function TeamPage({ store }: { store: Store }) {
               <li><a className="btn btn-soft" href="#/inspo">Pick the fit of the week</a></li>
               <li><a className="btn btn-soft" href="#/inspo/new">Post a look</a></li>
             </ul>
-            <p className="hint">You can remove any listing or look that breaks the rules from its own page.</p>
+            <p className="hint">You can remove any listing, look or rating that breaks the rules from its own page.</p>
+          </section>
+        ) : null}
+        {store.myRole ? (
+          <section className="step">
+            <h2 className="section-h section-h-in">Featured brand activity</h2>
+            <p className="hint">Counted on this device only while {APP_NAME} is in preview.</p>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr><th scope="col">Brand</th><th scope="col">Banner views</th><th scope="col">Store clicks</th><th scope="col">Listing views</th></tr>
+                </thead>
+                <tbody>
+                  {FEATURED.map((f) => {
+                    const st = readStats()[f.brand]
+                    return (
+                      <tr key={f.brand}>
+                        <th scope="row">{f.brand}{f.example ? ' (example)' : ''}</th>
+                        <td>{st?.bannerViews ?? 0}</td>
+                        <td>{st?.storeClicks ?? 0}</td>
+                        <td>{st?.listingViews ?? 0}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </section>
         ) : (
           <form className="step" onSubmit={claim}>
