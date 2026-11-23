@@ -53,11 +53,11 @@ export const resetMail = (to, token) => ({
   to,
   subject: 'Reset your Unity password',
   text: [
-    'Someone asked to reset the password for your Unity account.',
-    '',
-    'Choose a new password here. The link works once, for one hour:',
+    'Here’s your link to choose a new Unity password:',
     `${PUBLIC_URL}/#/reset/${token}`,
     '',
-    'Didn’t ask for this? Ignore this email and your password stays the same.',
+    'It works once and expires in an hour.',
+    '',
+    'If you didn’t ask for this, you can ignore this email. Your password won’t change.',
   ].join('\n'),
 })
