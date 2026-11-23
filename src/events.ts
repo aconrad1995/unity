@@ -73,6 +73,10 @@ const sameEvent = (a: RaveEvent, b: RaveEvent) => {
 }
 
 /** The hand-checked list, plus whatever EDMTrain has when the server holds a key. Our own entries win on a match. */
+/** Each event gets its own wristband color, the way a festival picks a new one every year. */
+const BANDS = ['#ff2e93', '#ffd93d', '#8fb4ff', '#7de8c0', '#c3a8ff', '#ff9d4d']
+export const bandColor = (id: string) => BANDS[[...id].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7) % BANDS.length]
+
 export async function loadEvents(): Promise<RaveEvent[]> {
   let extra: RaveEvent[] = []
   try {
