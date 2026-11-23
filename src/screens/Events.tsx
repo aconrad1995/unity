@@ -120,7 +120,7 @@ export default function Events() {
             {spot ? <>Near <strong>{spot.label}</strong></> : 'Where are you?'}
           </h2>
           <div className="where-row">
-            <button type="button" className="btn" onClick={useMyLocation} disabled={locating}>
+            <button type="button" className="btn btn-soft" onClick={useMyLocation} disabled={locating}>
               <PinIcon /> {locating ? 'Finding you…' : 'Use my location'}
             </button>
             <label className="field-inline where-city">
