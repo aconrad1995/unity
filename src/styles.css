@@ -133,6 +133,7 @@ img, svg { display: block; }
   gap: 12px;
 }
 .top-row { grid-template-columns: 44px 1fr; align-items: center; gap: 8px; }
+.top-row > .top-title:first-child { grid-column: 1 / -1; }
 .cloud-edge { display: none; }
 
 .wordmark {
