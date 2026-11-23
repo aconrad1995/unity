@@ -1,6 +1,6 @@
 // Unity's service worker. It lets the app install to a home screen, opens the last copy of the
 // app when there's no signal at a festival, and shows push alerts. It never caches /api.
-const SHELL = 'unity-shell-v1'
+const SHELL = 'unity-shell-v2'
 
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (event) => {
@@ -41,4 +41,36 @@ self.addEventListener('fetch', (event) => {
       })),
     )
   }
+})
+
+// Push alerts: a new message, or a festival coming up.
+self.addEventListener('push', (event) => {
+  let data = {}
+  try {
+    data = event.data ? event.data.json() : {}
+  } catch {
+    data = { body: event.data ? event.data.text() : '' }
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'Unity', {
+      body: data.body || '',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: data.tag,
+      data: { url: data.url || '#/' },
+    }),
+  )
+})
+
+// Tapping an alert opens Unity at the right place, reusing an open window if there is one.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const target = new URL('/' + (event.notification.data?.url || '#/'), self.location.origin).href
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      const open = list.find((c) => new URL(c.url).origin === self.location.origin)
+      if (open) return open.navigate(target).then((c) => (c ?? open).focus())
+      return self.clients.openWindow(target)
+    }),
+  )
 })
