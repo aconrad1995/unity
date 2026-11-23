@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { lastDay, type RaveEvent } from './events'
+import { deviceKey } from './store'
 
 /** Festivals this person marked "I'm going". Kept on this device, with enough detail to count down
     even if the event later drops out of the list (an EDMTrain listing that changes, say). */
@@ -25,6 +26,53 @@ function write(list: GoingEvent[]) {
     /* remembering is optional */
   }
   window.dispatchEvent(new Event(CHANGED))
+  void share(list)
+}
+
+/* ---------- How many people on Unity are going ----------
+   The server keeps each device's list so it can count, and only ever sends totals back. */
+const COUNTS = 'unity:going-counts'
+let counts: Record<string, number> = {}
+let shared = false
+function setCounts(next: unknown) {
+  if (next && typeof next === 'object') {
+    counts = next as Record<string, number>
+    window.dispatchEvent(new Event(COUNTS))
+  }
+}
+async function share(list: GoingEvent[]) {
+  shared = true
+  try {
+    const res = await fetch('/api/going', {
+      method: 'PUT',
+      headers: { 'x-unity-key': deviceKey(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: upcoming(list).map((x) => x.id) }),
+    })
+    if (res.ok) setCounts((await res.json()).counts)
+  } catch {
+    /* counts are a nice extra; the list on this device still works */
+  }
+}
+/** Totals per festival id. Sends this device's list once per visit, so lists made before counts existed count too. */
+export function useGoingCounts() {
+  const [value, setValue] = useState(counts)
+  useEffect(() => {
+    const sync = () => setValue(counts)
+    window.addEventListener(COUNTS, sync)
+    const mine = read()
+    if (!shared && mine.length) void share(mine)
+    else fetch('/api/going').then((r) => (r.ok ? r.json() : null)).then((j) => setCounts(j?.counts)).catch(() => {})
+    return () => window.removeEventListener(COUNTS, sync)
+  }, [])
+  return value
+}
+
+/** "You and 4 others on Unity", "12 people on Unity", or nothing when no one else is going yet. */
+export function goingLabel(total: number | undefined, mine: boolean): string {
+  const others = (total ?? 0) - (mine ? 1 : 0)
+  if (others <= 0) return ''
+  if (mine) return `You and ${others} ${others === 1 ? 'other' : 'others'} on Unity`
+  return `${others} ${others === 1 ? 'person' : 'people'} on Unity going`
 }
 
 const today = () => {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CheckIcon, PinIcon, SearchIcon } from '../art'
 import { CITIES, EVENTS_CHECKED, GENRES, bandColor, bandPrint, dateParts, lastDay, loadEvents, milesBetween, type Genre, type RaveEvent } from '../events'
-import { useGoing } from '../going'
+import { goingLabel, useGoing, useGoingCounts } from '../going'
 import { PageHeader } from './PageHeader'
 
 interface Spot { label: string; lat: number; lng: number }
@@ -27,6 +27,7 @@ export default function Events() {
   const [events, setEvents] = useState<RaveEvent[] | null>(null)
   const [spot, setSpot] = useState<Spot | null>(() => load<Spot | null>(SPOT_KEY, null))
   const going = useGoing()
+  const counts = useGoingCounts()
   const [radius, setRadius] = useState(150)
   const [genre, setGenre] = useState<Genre | ''>('')
   const [query, setQuery] = useState('')
@@ -105,6 +106,7 @@ export default function Events() {
             {ev.place}, {ev.city}
             {miles !== null && <> · <strong>{miles < 1 ? 'in town' : `${Math.round(miles)} miles away`}</strong></>}
           </p>
+          {goingLabel(counts[ev.id], isGoing) && <p className="event-crowd">{goingLabel(counts[ev.id], isGoing)}</p>}
           {ev.note && <p className="event-note">{ev.note}</p>}
           {ev.via && <p className="event-note">Listing from {ev.via}</p>}
           <div className="event-actions">

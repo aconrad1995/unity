@@ -31,7 +31,7 @@ const KEY_KEY = 'unity.key.v1'
 const SAMPLES_UNTIL = 8
 const READ_KEY = 'unity.read.v1'
 
-function deviceKey(): string {
+export function deviceKey(): string {
   let key = ''
   try {
     key = localStorage.getItem(KEY_KEY) ?? ''

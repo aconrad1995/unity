@@ -511,6 +511,7 @@ select:disabled { opacity: 0.55; }
 .event-where { color: var(--ink-soft); }
 .event-where strong { color: var(--ink); font-weight: 500; }
 .event-note { font-size: 0.875rem; color: var(--ink-soft); }
+.event-crowd { font-size: 0.875rem; font-weight: 600; color: var(--accent-text); }
 .event-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .event-actions .btn { min-height: 44px; padding: 0 16px; font-size: 0.9375rem; flex: 1 1 auto; white-space: nowrap; }
 .going { gap: 8px; }
