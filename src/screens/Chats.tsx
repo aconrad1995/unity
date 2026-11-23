@@ -5,7 +5,7 @@ import { NO_ONE, nameOf, readProfile, type Store } from '../store'
 import { Avatar } from './ProfilePage'
 import { PageHeader } from './PageHeader'
 import { RoleBadge } from './Team'
-import { InstagramLink, RateCard, RatingLine } from './Seller'
+import { InstagramLink, RateCard, RatingLine, SellerHistory } from './Seller'
 
 function when(at: number): string {
   const d = new Date(at)
@@ -125,6 +125,7 @@ export function ChatThread({ store, user, listingId }: { store: Store; user: str
               <div className="thread-who-text">
                 <RoleBadge role={store.roles[user]} />
                 {sells && <a className="thread-seller" href={`#/seller/${user}`}><RatingLine summary={store.ratings[user]} /> <span className="inline-link">Seller page</span></a>}
+                {sells && <SellerHistory store={store} id={user} />}
                 <InstagramLink handle={person.instagram} />
                 {person.upFor.length > 0 && <p className="seller-upfor">{name} is up for: {person.upFor.join(', ').toLowerCase()}</p>}
               </div>
@@ -133,14 +134,24 @@ export function ChatThread({ store, user, listingId }: { store: Store; user: str
         })()}
 
         {about && (
-          <a className="thread-about" href={`#/item/${about.id}`}>
-            <span className="thread-about-photo"><ListingImage listing={about} /></span>
-            <span>
-              <span className="hint">Chatting about</span>
-              <strong>{about.title}</strong>
-              <span>{money(about.price)} ·{about.brand} · {about.size}{about.status ? ` · ${about.status === 'sold' ? 'Sold' : 'Reserved'}` : ''}</span>
-            </span>
-          </a>
+          <div className="thread-deal">
+            <a className="thread-about" href={`#/item/${about.id}`}>
+              <span className="thread-about-photo"><ListingImage listing={about} /></span>
+              <span>
+                <span className="hint">Chatting about</span>
+                <strong>{about.title}</strong>
+                <span>{money(about.price)} · {about.brand} · {about.size}{about.status ? ` · ${about.status === 'sold' ? 'Sold' : 'Reserved'}` : ''}</span>
+              </span>
+            </a>
+            {/* Buying happens between two people, so the safe way to do it stays in view for the whole chat. */}
+            {about.status !== 'sold' && !isBlocked && (
+              <ol className="deal-steps" aria-label="How buying works">
+                <li>Agree the price and shipping here</li>
+                <li>Pay with PayPal Goods &amp; Services, never “friends and family”</li>
+                <li>{about.ownerId === store.me ? 'Send it and share the tracking number' : 'The seller sends it with a tracking number'}</li>
+              </ol>
+            )}
+          </div>
         )}
         {goneTitle && (
           <p className="thread-about thread-about-gone"><span><span className="hint">Chatting about</span><strong>{goneTitle}</strong><span>No longer listed</span></span></p>
@@ -171,9 +182,6 @@ export function ChatThread({ store, user, listingId }: { store: Store; user: str
           </ol>
         ) : (
           !isBlocked && <p className="thread-start">Say hi to {name}. Only the two of you can see this chat.</p>
-        )}
-        {about && !isBlocked && messages.length < 4 && (
-          <p className="buy-how buy-how-chat">Agree the price and shipping here. {APP_NAME} doesn’t take payment yet, so pay with buyer protection, like PayPal Goods &amp; Services. Never pay as “friends and family”.</p>
         )}
 
         {!isBlocked && <RateCard key={user} store={store} user={user} />}

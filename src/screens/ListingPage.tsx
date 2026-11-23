@@ -8,7 +8,7 @@ import { noteListing } from '../taste'
 import { SaveButton } from './Card'
 import { RoleBadge } from './Team'
 import { PageHeader } from './PageHeader'
-import { RatingLine } from './Seller'
+import { RatingLine, SellerHistory } from './Seller'
 
 export default function ListingPage({ store, id }: { store: Store; id: string }) {
   const listing: Listing | undefined = store.listings.find((l) => l.id === id)
@@ -118,6 +118,7 @@ export default function ListingPage({ store, id }: { store: Store; id: string })
                 <strong>Sold by {isMine ? 'you' : nameOf(seller)}</strong>
                 <RoleBadge role={store.roles[listing.ownerId!]} />
                 <RatingLine summary={store.ratings[listing.ownerId!]} />
+                <SellerHistory store={store} id={listing.ownerId!} />
                 {seller.instagram && <span className="seller-insta">@{seller.instagram}</span>}
                 {seller.upFor.length > 0
                   ? <span className="seller-upfor">Say hi about: {seller.upFor.join(', ').toLowerCase()}</span>
@@ -152,7 +153,9 @@ export default function ListingPage({ store, id }: { store: Store; id: string })
               ) : listing.ownerId ? (
                 <>
                   {/* Paying inside the app isn't switched on yet, so buying starts as a chat with the seller. */}
-                  <div className="buy-row">
+                  {/* Stays above the tab bar while you scroll, so the way to buy is always in reach. */}
+                  <div className="buy-row buy-bar">
+                    <span className="buy-bar-price" aria-hidden="true">{money(listing.price)}</span>
                     <a className="btn" href={`#/chats/${listing.ownerId}/${listing.id}`}>Message seller to buy</a>
                     <SaveButton store={store} id={listing.id} big />
                   </div>

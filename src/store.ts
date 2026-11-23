@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { EMPTY_PROFILE, SAMPLE_LISTINGS, type Listing, type Profile } from './data'
 
 // Private things (saved outfits, preferences, what the shop has learned) stay in this browser.
@@ -49,6 +49,8 @@ export function deviceKey(): string {
 export interface Person { name: string; photo: string; upFor: string[]; instagram?: string }
 export interface Rating { by: string; stars: number; note: string; at: number }
 export interface RatingSummary { count: number; average: number; recent: Rating[] }
+/** When a seller first listed, and how many outfits they've marked sold. */
+export interface SellerFacts { since: number; sold: number }
 
 /** An Instagram handle from "@name", "name" or a profile link, the same way the server reads it. '' when it isn't one. */
 export function instagramOf(v: string): string {
@@ -62,7 +64,7 @@ export interface Fit { lookId: string; note: string; at: number; by: string }
 export interface Report { id: string; by: string; user: string; reason: string; at: number; resolved?: number; evidence: Message[] }
 interface Shared {
   rev: number; me: string; listings: Listing[]; people: Record<string, Person>; messages: Message[]; blocked: string[]
-  roles: Record<string, Role>; myRole: Role; looks: Look[]; fit: Fit | null; ratings: Record<string, RatingSummary>; account: string | null; mailOn?: boolean
+  roles: Record<string, Role>; myRole: Role; looks: Look[]; fit: Fit | null; ratings: Record<string, RatingSummary>; sellers?: Record<string, SellerFacts>; account: string | null; mailOn?: boolean
 }
 const NOTHING: Shared = { rev: 0, me: '', listings: [], people: {}, messages: [], blocked: [], roles: {}, myRole: '', looks: [], fit: null, ratings: {}, account: null }
 
@@ -454,7 +456,7 @@ export function useStore() {
 
   return {
     listings, mine, saved, online, me: shared.me, people: shared.people, blocked: shared.blocked, chats, unread,
-    roles: shared.roles ?? {}, myRole: shared.myRole ?? '', looks: shared.looks ?? [], fit: shared.fit ?? null, ratings: shared.ratings ?? {}, account: shared.account ?? null, mailOn: shared.mailOn === true, signUp, changePassword, resetPassword,
+    roles: shared.roles ?? {}, myRole: shared.myRole ?? '', looks: shared.looks ?? [], fit: shared.fit ?? null, ratings: shared.ratings ?? {}, sellers: shared.sellers ?? {}, account: shared.account ?? null, mailOn: shared.mailOn === true, signUp, changePassword, resetPassword,
     nameRefused: refusal === 'name', handleRefused: refusal === 'handle', rate, unrate, removeRating, canRate, addListing, editListing, removeListing, toggleSaved, sendMessage, retryMessage, discardMessage, setBlocked, report, markRead,
     addLook, removeLook, claimRole, pickFit, teamReports, resolveReport,
   }
@@ -485,27 +487,29 @@ if (typeof window !== 'undefined') {
 }
 
 export function useRoute(): string[] {
-  const [hash, setHash] = useState(() => window.location.hash)
+  const [route, setRoute] = useState<{ hash: string; y: number | null; fresh: boolean }>(() => ({ hash: window.location.hash, y: null, fresh: false }))
   useEffect(() => {
     const onChange = () => {
       // The page hasn't re-rendered yet, so this is still where the outgoing page was scrolled.
       scrollAt.set(entry, window.scrollY)
       const fresh = stamp()
-      setHash(window.location.hash)
-      const y = fresh ? 0 : scrollAt.get(entry) ?? 0
-      // Wait for the new page to render before scrolling, then point screen readers at its heading.
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        window.scrollTo(0, y)
-        if (fresh) {
-          const h = document.querySelector<HTMLElement>('main h1, header h1, h1')
-          if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }) }
-        }
-      }))
+      setRoute({ hash: window.location.hash, y: fresh ? 0 : scrollAt.get(entry) ?? 0, fresh })
     }
     window.addEventListener('hashchange', onChange)
     return () => window.removeEventListener('hashchange', onChange)
   }, [])
-  return hash.replace(/^#\/?/, '').split('/').filter(Boolean)
+  // Runs once the new page is in the DOM and before it is painted, so a new page never shows
+  // at the old page's scroll, and Back never flashes the top first. Not tied to animation frames,
+  // which a hidden or busy browser can hold back.
+  useLayoutEffect(() => {
+    if (route.y === null) return
+    window.scrollTo(0, route.y)
+    if (route.fresh) {
+      const h = document.querySelector<HTMLElement>('main h1, header h1, h1')
+      if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }) }
+    }
+  }, [route])
+  return route.hash.replace(/^#\/?/, '').split('/').filter(Boolean)
 }
 
 /** Shrinks a chosen photo so it fits in browser storage. */
