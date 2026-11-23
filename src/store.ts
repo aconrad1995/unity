@@ -240,12 +240,20 @@ export function useStore() {
   useEffect(() => {
     let stopped = false
     let busy = false
+    let misses = 0
     async function tick() {
-      if (busy || stopped) return
+      // A phone in a pocket doesn't need the shop every 2.5 seconds; it catches up when it's back.
+      if (busy || stopped || document.hidden) return
       busy = true
+      try { await step() } catch { /* one bad round never stops syncing */ } finally { busy = false }
+    }
+    async function step() {
       const got = await call('GET', `sync?rev=${latest.current.rev}`)
       if (stopped) return
-      setOnline(got.data !== null)
+      // One dropped request on a festival campsite's signal isn't "offline"; two in a row is.
+      misses = got.data ? 0 : misses + 1
+      if (got.data) setOnline(true)
+      else if (misses >= 2 || latest.current.rev === 0) setOnline(false)
       if (got.data && !got.data.same) take(got.data)
       if (got.data) {
         // Messages that did not go through earlier are tried again now that the server answers.
@@ -288,13 +296,17 @@ export function useStore() {
           }
         }
       }
-      busy = false
     }
-    tick()
+    const onVisible = () => { if (!document.hidden) void tick() }
+    void tick()
     const timer = window.setInterval(tick, 2500)
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('online', onVisible)
     return () => {
       stopped = true
       window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('online', onVisible)
     }
   }, [take, deliver])
 
