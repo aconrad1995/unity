@@ -40,6 +40,33 @@ test('photos are kept as files, not inside the data file, and removing a listing
   assert.equal(readdirSync(join(dir, 'photos')).length, 0)
 })
 
+test('a seller can reorder, remove and add photos when editing, and the old files go', async () => {
+  const made = await shopper.call('POST', 'listings', listing({ art: undefined, photos: [jpeg(1), jpeg(2)] }))
+  const id = made.body.id
+  const before = made.body.listings.find((x) => x.id === id)
+  const coverOf = async () => Buffer.from(await (await fetch(`${app.base}/api/photo/${id}/0`)).arrayBuffer())[4]
+  assert.equal(await coverOf(), 1)
+
+  // Second photo becomes the cover, the first is dropped, a new one is added.
+  const edited = await shopper.call('PATCH', `listings/${id}`, { photos: [1, jpeg(3)] })
+  assert.equal(edited.status, 200)
+  const after = edited.body.listings.find((x) => x.id === id)
+  assert.equal(after.photoCount, 2)
+  assert.notEqual(after.photoV, before.photoV, 'photo addresses change so phones fetch the new pictures')
+  assert.equal(await coverOf(), 2)
+  assert.equal(readdirSync(join(dir, 'photos')).length, 2)
+
+  // Nonsense is refused and changes nothing.
+  for (const photos of [[], [0, 0], [5], ['data:image/png;base64,AAAA'], [0, 1, 0, 1, 0, 1]]) {
+    assert.equal((await shopper.call('PATCH', `listings/${id}`, { photos })).status, 400, JSON.stringify(photos))
+  }
+  assert.equal((await other.call('PATCH', `listings/${id}`, { photos: [0] })).status, 404)
+  assert.equal(readdirSync(join(dir, 'photos')).length, 2)
+
+  await shopper.call('DELETE', `listings/${id}`)
+  assert.equal(readdirSync(join(dir, 'photos')).length, 0)
+})
+
 test('removing something that is not there changes nothing', async () => {
   const before = (await shopper.call('GET', 'sync')).body.rev
   await shopper.call('DELETE', 'listings/not-a-real-listing')

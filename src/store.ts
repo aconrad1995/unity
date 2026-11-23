@@ -331,10 +331,13 @@ export function useStore() {
   }, [take])
 
   /** Changes a listing's details or marks it sold / reserved. Returns why it failed, or '' when it worked. */
-  const editListing = useCallback(async (id: string, change: Partial<Pick<Listing, 'title' | 'price' | 'description' | 'size' | 'condition' | 'shipDays'>> & { status?: Listing['status'] | null }) => {
+  /** `photos` is the new order: a number keeps that existing photo, a JPEG data URL adds one. */
+  const editListing = useCallback(async (id: string, change: Partial<Pick<Listing, 'title' | 'price' | 'description' | 'size' | 'condition' | 'shipDays'>> & { status?: Listing['status'] | null; photos?: (number | string)[] }) => {
     const r = await call('PATCH', `listings/${id}`, change)
     if (take(r.data)) return ''
-    return r.error === 'bad_details' ? 'Check the name and price, then try again.' : r.status === 0 ? 'Unity can’t be reached. Check your connection.' : 'That change could not be saved. Try again in a moment.'
+    if (r.status === 0) return 'Unity can’t be reached. Check your connection.'
+    if (r.error === 'bad_details') return 'Check the name and price, then try again.'
+    return (r.error && r.error !== 'rate_limited' && LISTING_WHY[r.error]) || 'That change could not be saved. Try again in a moment.'
   }, [take])
 
   const removeListing = useCallback(async (id: string) => take(await fetchData('DELETE', `listings/${id}`)), [take])

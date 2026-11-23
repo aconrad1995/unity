@@ -1,8 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { CheckIcon, ListingImage } from '../art'
-import { APP_NAME, CONDITIONS, SHIP_OPTIONS, SIZES, arrivesBefore, arrivesBy, featuredFor, money, type ConditionId, type Listing, type Size } from '../data'
+import { CheckIcon, CloseIcon, ListingImage, PlusIcon } from '../art'
+import { APP_NAME, CONDITIONS, SHIP_OPTIONS, SIZES, arrivesBefore, arrivesBy, featuredFor, money, photoSrc, type ConditionId, type Listing, type Size } from '../data'
 import { useGoing } from '../going'
-import { NO_ONE, bumpStat, nameOf, type Store } from '../store'
+import { NO_ONE, bumpStat, nameOf, shrinkPhoto, type Store } from '../store'
 import { Avatar } from './ProfilePage'
 import { noteListing } from '../taste'
 import { SaveButton } from './Card'
@@ -85,7 +85,7 @@ export default function ListingPage({ store, id }: { store: Store; id: string })
               {Array.from({ length: listing.photoCount! }, (_, i) => (
                 <li key={i}>
                   <button type="button" aria-label={`Show photo ${i + 1} of ${listing.photoCount}`} aria-current={i === shot ? 'true' : undefined} onClick={() => setShot(i)}>
-                    <img src={`/api/photo/${listing.id}/${i}`} alt="" loading="lazy" />
+                    <img src={photoSrc(listing, i)} alt="" loading="lazy" />
                   </button>
                 </li>
               ))}
@@ -133,7 +133,7 @@ export default function ListingPage({ store, id }: { store: Store; id: string })
               ? <EditListing store={store} listing={listing} done={() => setEditing(false)} />
               : (
                 <div className="actions seller-tools">
-                  <button type="button" className="btn btn-wide" onClick={() => setEditing(true)}>Edit details or price</button>
+                  <button type="button" className="btn btn-wide" onClick={() => setEditing(true)}>Edit photos or details</button>
                   <div className="actions-row">
                     {listing.status === 'sold'
                       ? <button type="button" className="btn btn-soft" onClick={() => store.editListing(listing.id, { status: null })}>Not sold after all</button>
@@ -221,7 +221,9 @@ export default function ListingPage({ store, id }: { store: Store; id: string })
   )
 }
 
-/** The seller changes the name, price, size, condition or description without listing it again. */
+const MAX_EDIT_PHOTOS = 5
+
+/** The seller changes the photos, name, price, size, condition or description without listing it again. */
 function EditListing({ store, listing, done }: { store: Store; listing: Listing; done: () => void }) {
   const [title, setTitle] = useState(listing.title)
   const [price, setPrice] = useState(String(listing.price))
@@ -231,14 +233,34 @@ function EditListing({ store, listing, done }: { store: Store; listing: Listing;
   const [shipDays, setShipDays] = useState(listing.shipDays)
   const [problem, setProblem] = useState('')
   const [busy, setBusy] = useState(false)
+  // Each photo is either one already on the listing (its number) or a new one (its data URL).
+  const original = Array.from({ length: listing.photoCount ?? 0 }, (_, i) => i)
+  const [pics, setPics] = useState<(number | string)[]>(original)
+  const [picProblem, setPicProblem] = useState('')
+  const picsChanged = pics.length !== original.length || pics.some((p, i) => p !== original[i])
+
+  async function addPics(files: FileList | null) {
+    if (!files || files.length === 0) return
+    const room = MAX_EDIT_PHOTOS - pics.length
+    const added: string[] = []
+    let unreadable = 0
+    for (const file of Array.from(files).slice(0, room)) {
+      try { added.push(await shrinkPhoto(file)) } catch { unreadable++ }
+    }
+    setPics((cur) => [...cur, ...added].slice(0, MAX_EDIT_PHOTOS))
+    setPicProblem(unreadable > 0
+      ? 'One of those files could not be opened. Try a JPG or PNG photo.'
+      : files.length > room ? `You can have up to ${MAX_EDIT_PHOTOS} photos, so the extras were left out.` : '')
+  }
 
   async function save(e: FormEvent) {
     e.preventDefault()
     const amount = Math.round(Number(price))
+    if (picsChanged && pics.length === 0) return setProblem('Keep at least one photo of your outfit.')
     if (!title.trim()) return setProblem('Give your outfit a short name.')
     if (!(amount >= 1 && amount <= 10000)) return setProblem('Enter a price between $1 and $10,000.')
     setBusy(true)
-    const why = await store.editListing(listing.id, { title: title.trim(), price: amount, size, condition, description: description.trim() || 'No description added.', ...(shipDays ? { shipDays } : {}) })
+    const why = await store.editListing(listing.id, { title: title.trim(), price: amount, size, condition, description: description.trim() || 'No description added.', ...(shipDays ? { shipDays } : {}), ...(picsChanged ? { photos: pics } : {}) })
     setBusy(false)
     if (why) setProblem(why)
     else done()
@@ -247,6 +269,32 @@ function EditListing({ store, listing, done }: { store: Store; listing: Listing;
   return (
     <form className="step edit-listing" onSubmit={save}>
       <h2 className="section-h section-h-in">Edit your outfit</h2>
+      {(listing.photoCount ?? 0) > 0 && (
+        <div className="field" role="group" aria-labelledby="edit-photos-l">
+          <span id="edit-photos-l">Photos</span>
+          <ul className="photo-grid" aria-label="Your photos">
+            {pics.map((p, i) => (
+              <li key={typeof p === 'number' ? `keep-${p}` : `add-${p.slice(-40)}-${i}`} className="photo-tile">
+                <img src={typeof p === 'number' ? photoSrc(listing, p) : p} alt={`Photo ${i + 1}`} />
+                {i === 0 ? <span className="cover-tag">Cover</span> : (
+                  <button type="button" className="cover-btn" onClick={() => setPics((cur) => [cur[i], ...cur.filter((_, j) => j !== i)])}>Make cover</button>
+                )}
+                <button type="button" className="tile-x" aria-label={`Remove photo ${i + 1}`} onClick={() => setPics((cur) => cur.filter((_, j) => j !== i))}><CloseIcon /></button>
+              </li>
+            ))}
+            {pics.length < MAX_EDIT_PHOTOS && (
+              <li className="photo-tile photo-add">
+                <label>
+                  <PlusIcon />
+                  <span>Add more</span>
+                  <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => { void addPics(e.target.files); e.target.value = '' }} />
+                </label>
+              </li>
+            )}
+          </ul>
+          {picProblem && <p className="error" role="alert">{picProblem}</p>}
+        </div>
+      )}
       <label className="field"><span>Name</span><input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={60} /></label>
       <label className="field price-field">
         <span>Price in dollars</span>
@@ -263,7 +311,7 @@ function EditListing({ store, listing, done }: { store: Store; listing: Listing;
       <div className="field" role="group" aria-labelledby="edit-cond-l">
         <span id="edit-cond-l">How worn is it?</span>
         <div className="bubbles bubbles-wrap">
-          {CONDITIONS.map((c) => <button key={c.id} type="button" className="bubble bubble-blue" aria-pressed={condition === c.id} onClick={() => setCondition(c.id)}>{c.label}</button>)}
+          {CONDITIONS.map((c) => <button key={c.id} type="button" className="bubble" aria-pressed={condition === c.id} onClick={() => setCondition(c.id)}>{c.label}</button>)}
         </div>
       </div>
       <div className="field" role="group" aria-labelledby="edit-ship-l">

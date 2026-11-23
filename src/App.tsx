@@ -14,6 +14,26 @@ import { InspoPage, LookPage, PostLook } from './screens/Inspo'
 import AlertsPage from './screens/AlertsPage'
 import { SellerPage } from './screens/Seller'
 import { useAlerts } from './alerts'
+import { Component, type ReactNode } from 'react'
+
+/** If one screen breaks (a bug, or a browser translator rewriting the page), show a way out
+    instead of a blank white app. The tab bar stays, and moving to another screen clears it. */
+class ScreenGuard extends Component<{ children: ReactNode }, { broken: boolean }> {
+  state = { broken: false }
+  static getDerivedStateFromError() { return { broken: true } }
+  render() {
+    if (!this.state.broken) return this.props.children
+    return (
+      <main className="page">
+        <div className="empty">
+          <h1 tabIndex={-1}>This screen hit a snag</h1>
+          <p>Nothing you saved is lost. Reload to try again.</p>
+          <button type="button" className="btn" onClick={() => window.location.reload()}>Reload</button>
+        </div>
+      </main>
+    )
+  }
+}
 
 export default function App() {
   const store = useStore()
@@ -45,7 +65,7 @@ export default function App() {
       {store.online === false && (
         <p className="offline" role="status">Can’t reach {APP_NAME}. Check your connection. Messages send once you’re back.</p>
       )}
-      {screen}
+      <ScreenGuard key={`${page}/${id ?? ''}`}>{screen}</ScreenGuard>
       {!inThread && <nav className="tabbar" aria-label="Main">
         <a href="#/" className="tab" aria-current={tab === 'shop' ? 'page' : undefined}>
           <ShopIcon />

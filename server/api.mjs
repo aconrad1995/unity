@@ -348,7 +348,8 @@ function snapshot(me) {
     rev: db.rev,
     me,
     // Photos are not sent in the sync; each one is fetched (and cached) from its own address.
-    listings: db.listings.map(({ photos, ...l }) => ({ ...l, photoCount: photos?.length ?? 0 })),
+    // photoV changes whenever the photos do, so their long-cached addresses change with them.
+    listings: db.listings.map(({ photos, ...l }) => ({ ...l, photoCount: photos?.length ?? 0, ...(photos?.length ? { photoV: sumOf(photos.join()) } : {}) })),
     people: Object.fromEntries(Object.entries(db.people).map(([id, { photoType, ...p }]) => [id, p])),
     // Only messages this person sent, or received from someone they have not blocked.
     // Messages that were silently dropped (the sender is blocked) never reach the recipient.
@@ -800,11 +801,28 @@ export async function api(req, res, next) {
       if (next.status === 'sold' && l.status !== 'sold') next.soldAt = Date.now()
       if (next.status !== 'sold') delete next.soldAt
       if (!next.status) delete next.status
+      // Photos: the new order, where a number keeps an existing photo and a JPEG adds one.
+      let dropped = []
+      if ('photos' in b) {
+        const want = Array.isArray(b.photos) ? b.photos : []
+        const old = l.photos ?? []
+        if (want.length < 1) throw new Refuse(400, 'bad_photo')
+        if (want.length > MAX_PHOTOS) throw new Refuse(400, 'too_many_photos')
+        const kept = want.filter((p) => typeof p === 'number')
+        if (!kept.every((i) => Number.isInteger(i) && i >= 0 && i < old.length) || new Set(kept).size !== kept.length) throw new Refuse(400, 'bad_photo')
+        const fresh = want.filter((p) => typeof p !== 'number')
+        if (!fresh.every((p) => jpegOk(p, 700_000))) throw new Refuse(400, 'bad_photo')
+        roomFor(me, fresh)
+        next.photos = want.map((p) => (typeof p === 'number' ? old[p] : storePhoto(p)))
+        dropped = old.filter((f) => !next.photos.includes(f))
+      }
       if (JSON.stringify(next) !== JSON.stringify(l)) {
         Object.keys(l).forEach((k) => delete l[k])
         Object.assign(l, next)
         save()
       }
+      // Old files go only once the listing no longer points at them.
+      dropped.forEach(dropPhoto)
       return send(res, 200, snapshot(me))
     }
 

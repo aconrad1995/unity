@@ -1,5 +1,5 @@
 import { useId, type SVGProps } from 'react'
-import type { ArtKind, Listing } from './data'
+import { photoSrc, type ArtKind, type Listing } from './data'
 
 /* Icons: one stroke weight, drawn on a 24 grid. */
 function Icon({ children, ...rest }: SVGProps<SVGSVGElement>) {
@@ -81,7 +81,7 @@ const hashOf = (text: string) => [...text].reduce((h, ch) => (h * 31 + ch.charCo
 export function ListingImage({ listing, index = 0 }: { listing: Listing; index?: number }) {
   const uid = useId().replace(/\W/g, '')
   if (listing.photoCount) {
-    return <img className="photo" src={`/api/photo/${listing.id}/${Math.min(index, listing.photoCount - 1)}`} alt={`${listing.title}, photo ${index + 1}`} loading="lazy" decoding="async" />
+    return <img className="photo" src={photoSrc(listing, Math.min(index, listing.photoCount - 1))} alt={`${listing.title}, photo ${index + 1}`} loading="lazy" decoding="async" />
   }
   const art = listing.art ?? { kind: 'set' as ArtKind, bg: '#FFE1EF', fill: '#FF7DB8', accent: '#FFFFFF' }
   const shape = GARMENT[art.kind] ?? GARMENT.set
