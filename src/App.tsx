@@ -33,6 +33,7 @@ export default function App() {
   else if (page === 'look' && id) screen = <LookPage key={id} store={store} id={id} />
   else if (page === 'alerts') screen = <AlertsPage store={store} alerts={alerts} />
   else if (page === 'brand' && id) screen = <Shop key={id} store={store} alerts={alerts} initialBrand={decodeURIComponent(id)} />
+  else if (page === 'shop-for' && id) screen = <Shop key={`for-${id}`} store={store} alerts={alerts} forEvent={decodeURIComponent(id)} />
   else if (page === 'you') screen = <ProfilePage store={store} />
   else screen = <Shop store={store} alerts={alerts} />
 
