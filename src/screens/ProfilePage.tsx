@@ -22,8 +22,8 @@ export function Avatar({ profile, size = 96 }: { profile: { photo: string }; siz
   )
 }
 
-function Picks({ label, hint, options, chosen, onChange, blue }: {
-  label: string; hint?: string; options: readonly string[]; chosen: string[]; onChange: (next: string[]) => void; blue?: boolean
+function Picks({ label, hint, options, chosen, onChange }: {
+  label: string; hint?: string; options: readonly string[]; chosen: string[]; onChange: (next: string[]) => void
 }) {
   const id = label.replace(/\W+/g, '-').toLowerCase()
   return (
@@ -34,7 +34,7 @@ function Picks({ label, hint, options, chosen, onChange, blue }: {
         {options.map((o) => {
           const on = chosen.includes(o)
           return (
-            <button key={o} type="button" className={`bubble${blue ? ' bubble-blue' : ''}`} aria-pressed={on}
+            <button key={o} type="button" className="bubble" aria-pressed={on}
               onClick={() => onChange(on ? chosen.filter((x) => x !== o) : [...chosen, o])}>
               {o}
             </button>
@@ -201,7 +201,7 @@ function StyleEdit() {
           <h2 id="prefs-h" className="section-h section-h-in">What you’re shopping for</h2>
           <p className="hint">The shop starts in your sizes, and Matches tells you when your sizes and brands are listed. This stays private on this phone.</p>
           <Picks label="My sizes" options={SIZES} chosen={profile.sizes} onChange={(sizes) => update({ sizes })} />
-          <Picks label="My style" hint="Pick as many as you like." options={VIBES} chosen={profile.vibes} onChange={(vibes) => update({ vibes })} blue />
+          <Picks label="My style" hint="Pick as many as you like." options={VIBES} chosen={profile.vibes} onChange={(vibes) => update({ vibes })} />
           <div className="field">
             <label htmlFor="fav-brand">Favorite brands</label>
             {profile.brands.length > 0 && (

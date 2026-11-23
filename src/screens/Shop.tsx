@@ -3,6 +3,7 @@ import { BellIcon, CameraIcon, HeartIcon, SearchIcon } from '../art'
 import type { Alerts } from '../alerts'
 import { APP_NAME, CATEGORIES, FEATURED, SIZES, arrivesBefore, arrivesBy, conditionLabel, featuredFor, type Listing } from '../data'
 import { useGoing } from '../going'
+import { usePageTitle } from './PageHeader'
 import { findEvent } from '../events'
 import { bumpStat, readProfile, type Store } from '../store'
 import { hasSignals, note, noteSearch, readTaste, score } from '../taste'
@@ -90,6 +91,7 @@ export default function Shop({ store, alerts, initialBrand = '', forEvent }: { s
   const real = results.filter((l) => !l.sample)
   const samples = results.filter((l) => l.sample)
 
+  usePageTitle(brand ? `${brand} outfits` : picked ? `Outfits for ${picked.name}` : '')
   return (
     <>
       <header className="top">
@@ -124,6 +126,7 @@ export default function Shop({ store, alerts, initialBrand = '', forEvent }: { s
       </header>
 
       <main className="page">
+        <h1 className="sr-only">{brand ? `${brand} outfits` : picked ? `Outfits for ${picked.name}` : 'Shop rave outfits'}</h1>
         <BackFrom />
         <Countdown />
         <div className="bubbles brand-row" role="group" aria-label="Brand">

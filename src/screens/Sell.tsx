@@ -195,7 +195,7 @@ export default function Sell({ store, wornFrom }: { store: Store; wornFrom?: str
               <span id="kind-l">Kind of item</span>
               <div className="bubbles bubbles-wrap">
                 {CATEGORIES.map((c) => (
-                  <button key={c} type="button" className="bubble bubble-blue" aria-pressed={category === c} onClick={() => { setCategory(c); fixed('category') }}>{c}</button>
+                  <button key={c} type="button" className="bubble" aria-pressed={category === c} onClick={() => { setCategory(c); fixed('category') }}>{c}</button>
                 ))}
               </div>
             </div>
