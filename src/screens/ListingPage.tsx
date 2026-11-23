@@ -268,12 +268,11 @@ function EditListing({ store, listing, done }: { store: Store; listing: Listing;
 
 /** When it ships and roughly when it lands, and whether that beats your next festival. */
 function Shipping({ listing }: { listing: Listing }) {
-  const { next } = useGoing()
+  const { nextDated: ev } = useGoing()
   const by = arrivesBy(listing)
   if (!by || listing.status === 'sold') return null
   const label = SHIP_OPTIONS.find((o) => o.days === listing.shipDays)?.label ?? ''
   const when = by.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-  const ev = next[0]
   const inTime = ev ? arrivesBefore(listing, ev.date) : false
   return (
     <div className="ship-card">

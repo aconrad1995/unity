@@ -3,7 +3,7 @@ import { lastDay, type RaveEvent } from './events'
 
 /** Festivals this person marked "I'm going". Kept on this device, with enough detail to count down
     even if the event later drops out of the list (an EDMTrain listing that changes, say). */
-export type GoingEvent = Pick<RaveEvent, 'id' | 'name' | 'city' | 'date' | 'days' | 'url'>
+export type GoingEvent = Pick<RaveEvent, 'id' | 'name' | 'city' | 'date' | 'days' | 'url' | 'tba'>
 
 const KEY = 'unity.going.v2'
 const CHANGED = 'unity:going'
@@ -68,7 +68,7 @@ export function answerBackFrom(id: string) {
 
 /** Marked festivals that ended in the last three weeks, newest first. */
 export const pastGoing = (list: GoingEvent[]) =>
-  list.filter((x) => { const end = lastDay(x); return end < today() && -daysUntil(end) <= BACK_DAYS }).sort((a, b) => b.date.localeCompare(a.date))
+  list.filter((x) => { if (x.tba) return false; const end = lastDay(x); return end < today() && -daysUntil(end) <= BACK_DAYS }).sort((a, b) => b.date.localeCompare(a.date))
 
 export function useGoing() {
   const [list, setList] = useState(read)
@@ -86,9 +86,12 @@ export function useGoing() {
     const cur = read()
     write(cur.some((x) => x.id === ev.id)
       ? cur.filter((x) => x.id !== ev.id)
-      : [...cur, { id: ev.id, name: ev.name, city: ev.city, date: ev.date, days: ev.days, url: ev.url }])
+      : [...cur, { id: ev.id, name: ev.name, city: ev.city, date: ev.date, days: ev.days, url: ev.url, ...(ev.tba ? { tba: true } : {}) }])
   }
   const answered = readBack()
   const backFrom = pastGoing(list).find((x) => !answered.includes(x.id))
-  return { list, next: upcoming(list), past: pastGoing(list), backFrom, isGoing, toggle }
+  const next = upcoming(list)
+  /** The next one with real dates, for anything that needs a day, like "arrives before". */
+  const nextDated = next.find((x) => !x.tba)
+  return { list, next, nextDated, past: pastGoing(list), backFrom, isGoing, toggle }
 }

@@ -17,7 +17,7 @@ export default function Shop({ store, alerts, initialBrand = '' }: { store: Stor
   const [category, setCategory] = useState('')
   const [size, setSize] = useState('')
   // With a festival marked, shoppers can keep only what should arrive before it.
-  const nextFest = useGoing().next[0]
+  const nextFest = useGoing().nextDated
   const [inTime, setInTime] = useState(false)
   const timeFilter = inTime && nextFest ? nextFest : undefined
   // What this shopper is into, read once per visit so the order doesn't jump while they browse.
