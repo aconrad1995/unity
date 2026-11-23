@@ -162,7 +162,7 @@ export default function Shop({ store, alerts, initialBrand = '', forEvent }: { s
       <main className="page">
         <h1 className="sr-only">{brand ? `${brand} outfits` : picked ? `Outfits for ${picked.name}` : 'Shop rave outfits'}</h1>
         <BackFrom />
-        <Countdown />
+        <Countdown compact />
         <div className="bubbles brand-row" role="group" aria-label="Brand">
           <button type="button" className="bubble" aria-pressed={brand === ''} onClick={() => setBrand('')}>All brands</button>
           {brandRow.map((b) => {

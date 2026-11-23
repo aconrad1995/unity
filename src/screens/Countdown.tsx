@@ -2,7 +2,7 @@ import { bandColor, bandPrint, dateParts } from '../events'
 import { answerBackFrom, daysUntil, useGoing } from '../going'
 
 /** Your next festival as a band-stub ticket, counting down. Shows nothing until you mark one, unless `prompt` is set. */
-export function Countdown({ prompt = false }: { prompt?: boolean }) {
+export function Countdown({ prompt = false, compact = false }: { prompt?: boolean; compact?: boolean }) {
   const { next } = useGoing()
   const ev = next[0]
 
@@ -22,6 +22,19 @@ export function Countdown({ prompt = false }: { prompt?: boolean }) {
   const unit = ev.tba ? 'dates soon' : left === 1 ? 'day to go' : left > 1 ? 'days to go' : left === 0 ? 'Today' : 'On now'
   const more = next.length - 1
   const label = ev.tba ? `${ev.name}, dates not announced yet` : left > 0 ? `${ev.name} in ${left} ${left === 1 ? 'day' : 'days'}` : `${ev.name} is on now`
+
+  // In the shop the ticket is a slim stub, so outfits start near the top of the screen.
+  if (compact) {
+    return (
+      <a className="countdown countdown-compact" href="#/events" data-print={bandPrint(ev.id)} style={{ ['--band' as string]: bandColor(ev.id) }} aria-label={`Your next festival: ${label}`}>
+        <div className="event-date" aria-hidden="true"><div><strong>{big}</strong></div></div>
+        <div className="countdown-main" aria-hidden="true">
+          <p className="countdown-name">{ev.name}</p>
+          <p className="countdown-when">{ev.tba ? 'Dates soon' : `${unit} · ${d.range.split(' to ')[0]}`}</p>
+        </div>
+      </a>
+    )
+  }
 
   return (
     <a className="countdown" href="#/events" data-print={bandPrint(ev.id)} style={{ ['--band' as string]: bandColor(ev.id) }} aria-label={`Your next festival: ${label}`}>

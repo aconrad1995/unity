@@ -616,6 +616,13 @@ thead th { font-size: 0.8125rem; color: var(--ink-soft); border-bottom: 2px soli
 .countdown-main p { color: var(--ink-soft); }
 .countdown-main .countdown-when { color: var(--ink); font-weight: 500; font-variant-numeric: tabular-nums; }
 .countdown-more { font-size: 0.875rem; }
+.countdown-compact { grid-template-columns: 72px minmax(0, 1fr); margin-bottom: 8px; }
+.countdown-compact .event-date { padding: 8px; }
+.countdown-compact .event-date > div { padding: 4px 2px; }
+.countdown-compact .event-date strong { font-size: 1.75rem; }
+.countdown-compact .countdown-main { gap: 2px; padding: 8px 16px; }
+.countdown-compact .countdown-name { font: 800 1.25rem/1.05 var(--wide); font-stretch: 75%; text-transform: uppercase; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.countdown-compact .countdown-when { font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .back-from .countdown-main > p:not(.event-kicker) { margin-bottom: 4px; }
 .back-from .event-actions { margin-top: 8px; }
 .card-worn { font-size: 0.8125rem; font-weight: 500; color: var(--accent-text); margin-top: 2px; }
@@ -676,8 +683,12 @@ thead th { font-size: 0.8125rem; color: var(--ink-soft); border-bottom: 2px soli
 
 /* ---------- Shop filters: one row of brand bubbles, then four compact chip menus ---------- */
 .brand-row { margin-top: 4px; }
-.filter-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-@media (min-width: 640px) { .filter-row { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+/* On phones the four menus sit on one row you can swipe, like the brands above. */
+.filter-row { display: flex; gap: 8px; overflow-x: auto; padding: 0 16px 4px; margin: 0 -16px; scrollbar-width: none; }
+.filter-row::-webkit-scrollbar { display: none; }
+/* Relative, so each menu's hidden screen-reader label stays inside the scrolling row instead of widening the page. */
+.filter-row .chip-select { flex: none; position: relative; }
+@media (min-width: 640px) { .filter-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); overflow: visible; padding: 0; margin: 0; } }
 .chip-select select {
   min-height: 44px; padding: 0 36px 0 16px; border-radius: var(--r-pill);
   font: 600 0.9375rem/1.2 var(--text); background-position: right 14px center;
