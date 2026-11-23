@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { InstallCard } from './InstallCard'
 import { CameraIcon, CloseIcon, ProfileIcon } from '../art'
 import { APP_NAME, BRANDS, SIZES, UP_FOR, VIBES, cleanBrand } from '../data'
 import { applyMoveCode, moveCode, shrinkPhoto, useProfile, type Store } from '../store'
@@ -81,6 +82,7 @@ export default function ProfilePage({ store }: { store: Store }) {
       <main className="page profile">
         <BackFrom />
         <Countdown prompt />
+        <InstallCard />
         <section className="step me">
           <label className="me-photo">
             <Avatar profile={profile} />

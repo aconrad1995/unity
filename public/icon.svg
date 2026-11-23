@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <pattern id="tw" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(25)">
+      <rect width="8" height="8" fill="#ff2e93"/>
+      <rect width="2" height="8" fill="#e8157f"/>
+    </pattern>
+  </defs>
+  <rect width="512" height="512" fill="url(#tw)"/>
+  <rect y="70" width="512" height="16" fill="#ffd93d"/>
+  <rect y="426" width="512" height="16" fill="#ffd93d"/>
+  <rect x="116" y="146" width="280" height="220" rx="28" fill="#ffffff" stroke="#17121c" stroke-width="12"/>
+  <path d="M168 196 V270 a52 52 0 0 0 104 0 V196" fill="none" stroke="#17121c" stroke-width="34" stroke-linecap="square"/>
+  <g fill="#17121c">
+    <rect x="312" y="196" width="10" height="120"/>
+    <rect x="334" y="196" width="10" height="120"/>
+    <rect x="356" y="196" width="10" height="120"/>
+  </g>
+</svg>
