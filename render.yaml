@@ -24,6 +24,10 @@ services:
         sync: false
       - key: UNITY_MAIL_FROM    # e.g. Unity <hello@unityrave.com>; the domain must be verified at Resend
         sync: false
+      # Nightly backups (.github/workflows/backup.yml). Same value as the GitHub secret; 32+ characters.
+      # Keep a copy in a password manager: without it no backup can be opened.
+      - key: UNITY_BACKUP_TOKEN
+        sync: false
     disk:
       name: unity-data
       mountPath: /var/data

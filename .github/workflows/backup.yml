@@ -1,0 +1,43 @@
+# Every night: download an encrypted backup of unityrave.com, check it opens, keep it for 30 days.
+# Needs the repository secret UNITY_BACKUP_TOKEN, the same value as UNITY_BACKUP_TOKEN in Render.
+# Backups are under Actions > Nightly backup > a run > Artifacts. Open one with scripts/restore-backup.mjs.
+name: Nightly backup
+
+on:
+  schedule:
+    - cron: '17 10 * * *' # 2:17am Pacific in winter, 3:17am in summer
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Download the backup
+        env:
+          TOKEN: ${{ secrets.UNITY_BACKUP_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then echo "::error::The UNITY_BACKUP_TOKEN secret is not set"; exit 1; fi
+          curl --fail --silent --show-error --retry 3 --retry-all-errors --max-time 900 \
+            -H "x-unity-backup: $TOKEN" -o unity-backup.bin https://unityrave.com/api/admin/backup
+
+      - name: Check it opens
+        env:
+          UNITY_BACKUP_TOKEN: ${{ secrets.UNITY_BACKUP_TOKEN }}
+        run: node scripts/restore-backup.mjs unity-backup.bin
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unity-backup-${{ github.run_number }}
+          path: unity-backup.bin
+          retention-days: 30
+          compression-level: 0
