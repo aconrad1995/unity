@@ -56,6 +56,8 @@ export interface Listing {
   /** Set by the seller. Sold outfits leave the shop after a day. */
   status?: 'sold' | 'reserved'
   soldAt?: number
+  /** The festival it was worn at, like "Tahoe Live 2026". Optional. */
+  wornAt?: string
 }
 
 export const conditionLabel = (id: ConditionId) => CONDITIONS.find((c) => c.id === id)!.label

@@ -376,7 +376,8 @@ function checkListing(b) {
   if (given.length > MAX_PHOTOS) throw new Refuse(400, 'too_many_photos')
   if (!given.every((p) => jpegOk(p, 700_000))) throw new Refuse(400, 'bad_photo')
   if (given.length === 0 && !art) throw new Refuse(400, 'missing_details')
-  return { title, brand, category: b.category, size: b.size, condition: b.condition, price, description: text(b.description, 600), art, photos: given }
+  const wornAt = text(b.wornAt, 60)
+  return { title, brand, category: b.category, size: b.size, condition: b.condition, price, description: text(b.description, 600), art, photos: given, ...(wornAt ? { wornAt } : {}) }
 }
 
 // Names that would let someone pass themselves off as the shop or the team.

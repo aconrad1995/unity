@@ -94,6 +94,7 @@ export default function ListingPage({ store, id }: { store: Store; id: string })
             <div><dt>Brand</dt><dd>{listing.brand}</dd></div>
             <div><dt>Size</dt><dd>{listing.size}</dd></div>
             <div><dt>Type</dt><dd>{listing.category}</dd></div>
+            {listing.wornAt && <div><dt>Worn at</dt><dd>{listing.wornAt}</dd></div>}
           </dl>
 
           <div className={`cond-card cond-${listing.condition}`}>

@@ -5,7 +5,7 @@ import { APP_NAME, CATEGORIES, FEATURED, SIZES, conditionLabel, featuredFor } fr
 import { bumpStat, readProfile, type Store } from '../store'
 import { hasSignals, note, noteSearch, readTaste, score } from '../taste'
 import { Card } from './Card'
-import { Countdown } from './Countdown'
+import { BackFrom, Countdown } from './Countdown'
 
 type Sort = 'you' | 'new' | 'low' | 'high'
 
@@ -53,7 +53,7 @@ export default function Shop({ store, alerts, initialBrand = '' }: { store: Stor
       if (brand && l.brand !== brand) return false
       if (category && l.category !== category) return false
       if (size && l.size !== size) return false
-      const hay = `${l.title} ${l.brand} ${l.category} ${l.size} ${conditionLabel(l.condition)} ${l.description}`.toLowerCase()
+      const hay = `${l.title} ${l.brand} ${l.category} ${l.size} ${conditionLabel(l.condition)} ${l.description} ${l.wornAt ?? ''}`.toLowerCase()
       return words.every((w) => hay.includes(w))
     })
     if (sort === 'you') out.sort((a, b) => score(b, taste, profile) - score(a, taste, profile) || b.createdAt - a.createdAt)
@@ -105,6 +105,7 @@ export default function Shop({ store, alerts, initialBrand = '' }: { store: Stor
       </header>
 
       <main className="page">
+        <BackFrom />
         <Countdown />
         <InspoStrip store={store} />
         <section aria-labelledby="brands-h">
