@@ -20,7 +20,6 @@ export function PageHeader({ title, back = '#/', backLabel = 'Back', noBack = fa
       <div className="top-inner top-row">
         {!noBack && <a href={back} className="back" aria-label={backLabel} onClick={(e) => goBack(e, back)}><BackIcon /></a>}
         <h1 className="top-title">{title}</h1>
-        <span className="band-print" aria-hidden="true">{`  /  UNITY  /  ${title}  /  UNITY  /  ${title}`}</span>
       </div>
       <div className="cloud-edge" aria-hidden="true" />
     </header>

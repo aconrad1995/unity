@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CheckIcon, PinIcon } from '../art'
-import { CITIES, EVENTS_CHECKED, bandColor, dateParts, loadEvents, milesBetween, type RaveEvent } from '../events'
+import { CITIES, EVENTS_CHECKED, bandColor, bandPrint, dateParts, lastDay, loadEvents, milesBetween, type RaveEvent } from '../events'
+import { useGoing } from '../going'
 import { PageHeader } from './PageHeader'
 
 interface Spot { label: string; lat: number; lng: number }
 const SPOT_KEY = 'unity.spot.v1'
-const GOING_KEY = 'unity.going.v1'
 
 function load<T>(key: string, fallback: T): T {
   try {
@@ -26,7 +26,7 @@ function save(key: string, value: unknown) {
 export default function Events() {
   const [events, setEvents] = useState<RaveEvent[] | null>(null)
   const [spot, setSpot] = useState<Spot | null>(() => load<Spot | null>(SPOT_KEY, null))
-  const [going, setGoing] = useState<string[]>(() => load<string[]>(GOING_KEY, []))
+  const going = useGoing()
   const [radius, setRadius] = useState(150)
   const [locating, setLocating] = useState(false)
   const [problem, setProblem] = useState('')
@@ -35,7 +35,6 @@ export default function Events() {
     loadEvents().then(setEvents)
   }, [])
   useEffect(() => save(SPOT_KEY, spot), [spot])
-  useEffect(() => save(GOING_KEY, going), [going])
 
   function useMyLocation() {
     setProblem('')
@@ -60,13 +59,11 @@ export default function Events() {
   const today = new Date().toISOString().slice(0, 10)
   const list = useMemo(() => {
     const upcoming = (events ?? [])
-      .filter((ev) => ev.date >= today)
+      .filter((ev) => lastDay(ev) >= today)
       .map((ev) => ({ ev, miles: spot ? milesBetween(spot, ev) : null }))
     const near = spot && radius > 0 ? upcoming.filter((x) => x.miles !== null && x.miles <= radius) : upcoming
     return near.sort((a, b) => a.ev.date.localeCompare(b.ev.date))
   }, [events, spot, radius, today])
-
-  const toggleGoing = (id: string) => setGoing((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
 
   const [next, ...rest] = list
   const months = useMemo(() => {
@@ -82,14 +79,16 @@ export default function Events() {
 
   const renderEvent = ({ ev, miles }: { ev: RaveEvent; miles: number | null }, feature = false) => {
     const d = dateParts(ev.date, ev.days)
-    const isGoing = going.includes(ev.id)
+    const isGoing = going.isGoing(ev.id)
     return (
-      <li key={ev.id} className={feature ? 'event event-feature' : 'event'} style={{ ['--band' as string]: bandColor(ev.id) }}>
+      <li key={ev.id} className={feature ? 'event event-feature' : 'event'} data-print={bandPrint(ev.id)} style={{ ['--band' as string]: bandColor(ev.id) }}>
         {feature && <div className="event-band" aria-hidden="true">{[0, 1, 2, 3].map((i) => <span key={i}>{ev.name} / {d.range} /</span>)}</div>}
         <div className="event-date" aria-hidden="true">
-          <span>{d.month}</span>
-          <strong>{String(d.day).padStart(2, '0')}</strong>
-          {ev.days > 1 && <small>{ev.days} days</small>}
+          <div>
+            <span>{d.month}</span>
+            <strong>{String(d.day).padStart(2, '0')}</strong>
+            {ev.days > 1 && <small>{ev.days} days</small>}
+          </div>
         </div>
         <div className="event-main">
           {feature && <p className="event-kicker">Next up · {d.away <= 0 ? 'today' : d.away === 1 ? 'tomorrow' : `in ${d.away} days`}</p>}
@@ -103,7 +102,7 @@ export default function Events() {
           {ev.via && <p className="event-note">Listing from {ev.via}</p>}
           <div className="event-actions">
             <a className="btn" href={ev.url} target="_blank" rel="noopener noreferrer">Dates and tickets</a>
-            <button type="button" className={`btn btn-soft going${isGoing ? ' is-going' : ''}`} aria-pressed={isGoing} onClick={() => toggleGoing(ev.id)}>
+            <button type="button" className={`btn btn-soft going${isGoing ? ' is-going' : ''}`} aria-pressed={isGoing} onClick={() => going.toggle(ev)}>
               {isGoing && <CheckIcon />} {isGoing ? 'I’m going' : 'Mark as going'}
             </button>
           </div>
