@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { CheckIcon, ListingImage } from '../art'
-import { CONDITIONS, SHIP_OPTIONS, SIZES, arrivesBefore, arrivesBy, featuredFor, type ConditionId, type Listing, type Size } from '../data'
+import { APP_NAME, CONDITIONS, SHIP_OPTIONS, SIZES, arrivesBefore, arrivesBy, featuredFor, type ConditionId, type Listing, type Size } from '../data'
 import { useGoing } from '../going'
 import { NO_ONE, bumpStat, nameOf, type Store } from '../store'
 import { Avatar } from './ProfilePage'
@@ -12,7 +12,6 @@ import { RatingLine } from './Seller'
 
 export default function ListingPage({ store, id }: { store: Store; id: string }) {
   const listing: Listing | undefined = store.listings.find((l) => l.id === id)
-  const [note, setNote] = useState<'' | 'chat'>('')
   const [editing, setEditing] = useState(false)
   const [shot, setShot] = useState(0)
   const [justListed] = useState(() => {
@@ -145,16 +144,21 @@ export default function ListingPage({ store, id }: { store: Store; id: string })
               {listing.status === 'sold' ? (
                 <p className="notice">This outfit has sold. Save it to find similar ones, or message the seller about other pieces.</p>
               ) : listing.ownerId ? (
-                // Paying inside the app isn't switched on yet, so buying starts as a chat with the seller.
-                <a className="btn btn-wide" href={`#/chats/${listing.ownerId}/${listing.id}`}>Message seller to buy</a>
+                <>
+                  {/* Paying inside the app isn't switched on yet, so buying starts as a chat with the seller. */}
+                  <a className="btn btn-wide" href={`#/chats/${listing.ownerId}/${listing.id}`}>Message seller to buy</a>
+                  <p className="buy-how">You’ll agree the price and shipping in the chat. {APP_NAME} doesn’t take payment yet, so pay with something that has buyer protection, like PayPal Goods &amp; Services.</p>
+                </>
               ) : (
-                <button type="button" className="btn btn-wide" onClick={() => setNote('chat')}>Message seller to buy</button>
+                <div className="sample-cta">
+                  <p><strong>This is an example listing.</strong> It shows how outfits look on {APP_NAME}, and it isn’t for sale.</p>
+                  <a className="btn btn-wide" href="#/sell">List yours in 2 minutes</a>
+                </div>
               )}
-              <div className="actions-row">
-                <SaveButton store={store} id={listing.id} big />
-              </div>
-              {note && (
-                <p className="notice" role="status">This is a sample listing, so there is no real seller to message. Outfits listed by real people can be messaged.</p>
+              {!listing.sample && (
+                <div className="actions-row">
+                  <SaveButton store={store} id={listing.id} big />
+                </div>
               )}
             </div>
           )}

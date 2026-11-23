@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import type { Listing } from './data'
 import { readProfile, type Store } from './store'
 
-/* New-outfit alerts. Your favourite brands and sizes stay on this phone, so the matching
+/* New-outfit alerts. Your favorite brands and sizes stay on this phone, so the matching
    happens here too: nothing about your taste is sent anywhere. */
 const KEY = 'unity.alerts.v1'
 interface AlertState { since: number; seenAt: number }
@@ -24,7 +24,7 @@ function load(): AlertState {
   return fresh
 }
 
-/** A new outfit matches when it is from a favourite brand in one of your sizes, or, with no favourite brands set, just in your size. */
+/** A new outfit matches when it is from a favorite brand in one of your sizes, or, with no favorite brands set, just in your size. */
 export function matchesYou(l: Listing, brands: string[], sizes: string[]): boolean {
   const sizeOk = sizes.length === 0 || sizes.includes(l.size) || l.size === 'One size'
   if (brands.length > 0) return brands.some((b) => b.toLowerCase() === l.brand.toLowerCase()) && sizeOk

@@ -55,7 +55,7 @@ export function ChatList({ store }: { store: Store }) {
           <div className="empty">
             <span className="empty-art"><ChatIcon /></span>
             <h2>No chats yet</h2>
-            <p>Find an outfit you like and tap “Message seller”. Your chats will wait for you here.</p>
+            <p>Find an outfit you like and tap “Message seller to buy”. Your chats will wait for you here.</p>
             <a className="btn" href="#/">Browse the shop</a>
           </div>
         )}
@@ -178,6 +178,9 @@ export function ChatThread({ store, user, listingId }: { store: Store; user: str
         ) : (
           !isBlocked && <p className="thread-start">Say hi to {name}. Only the two of you can see this chat.</p>
         )}
+        {about && !isBlocked && messages.length < 4 && (
+          <p className="buy-how buy-how-chat">Agree the price and shipping here. {APP_NAME} doesn’t take payment yet, so pay with buyer protection, like PayPal Goods &amp; Services. Never pay as “friends and family”.</p>
+        )}
 
         {!isBlocked && <RateCard key={user} store={store} user={user} />}
 
@@ -207,7 +210,7 @@ export function ChatThread({ store, user, listingId }: { store: Store; user: str
         <details className="safety">
           <summary>Staying safe, blocking and reporting</summary>
           <ul className="safety-tips">
-            <li>Paying inside {APP_NAME} isn’t switched on yet, so don’t send anyone money for an outfit.</li>
+            <li>{APP_NAME} doesn’t take payment yet. Pay with buyer protection, like PayPal Goods &amp; Services. Never pay as “friends and family”, by gift card or in crypto.</li>
             <li>Meeting up? Pick a busy public spot and tell a friend.</li>
             <li>Never share passwords, codes or card numbers in a chat.</li>
           </ul>

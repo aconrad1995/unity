@@ -63,7 +63,7 @@ export function InspoPage({ store }: { store: Store }) {
 
         {ownerLooks.length > 0 && (
           <section aria-labelledby="owner-h">
-            <h2 id="owner-h" className="section-h">{ownerName ? `${ownerName}’s favourites` : 'The owner’s favourites'}</h2>
+            <h2 id="owner-h" className="section-h">{ownerName ? `${ownerName}’s favorites` : 'The owner’s favorites'}</h2>
             <p className="hint section-sub">Outfits and styling picked by the shop owner.</p>
             <ul className="look-row">
               {ownerLooks.map((l) => <LookTile key={l.id} store={store} look={l} />)}
@@ -81,7 +81,6 @@ export function InspoPage({ store }: { store: Store }) {
             <div className="empty">
               <h2>No looks yet</h2>
               <p>Share what you wore and the brands you put together. The team picks a fit of the week from these.</p>
-              <a className="btn" href="#/inspo/new">Post your look</a>
             </div>
           )}
         </section>}

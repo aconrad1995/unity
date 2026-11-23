@@ -136,7 +136,7 @@ export default function ProfilePage({ store }: { store: Store }) {
           <Picks label="My sizes" options={SIZES} chosen={profile.sizes} onChange={(sizes) => update({ sizes })} />
           <Picks label="My style" hint="Pick as many as you like." options={VIBES} chosen={profile.vibes} onChange={(vibes) => update({ vibes })} blue />
           <div className="field">
-            <label htmlFor="fav-brand">Favourite brands</label>
+            <label htmlFor="fav-brand">Favorite brands</label>
             {profile.brands.length > 0 && (
               <ul className="chips">
                 {profile.brands.map((b) => (
@@ -196,7 +196,7 @@ export default function ProfilePage({ store }: { store: Store }) {
 
         <p className="fineprint">
           Other people can see your name, picture, Instagram, listings, ratings and “say hi about” picks. Your sizes, style,
-          favourite brands and what the shop has learned stay private on this device.
+          favorite brands and what the shop has learned stay private on this device.
         </p>
         <MoveAccount />
 

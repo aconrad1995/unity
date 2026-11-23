@@ -1,12 +1,10 @@
-import { APP_NAME, BRAND_CONTACT_EMAIL, FEATURED } from '../data'
-import { readStats } from '../store'
+import { APP_NAME, BRAND_CONTACT_EMAIL } from '../data'
 import { PageHeader } from './PageHeader'
 
 export default function ForBrands() {
-  const stats = readStats()
   return (
     <>
-      <PageHeader title="Feature your brand" />
+      <PageHeader title="For brands" />
       <main className="page prose">
         <h2>Put your brand in front of ravers shopping for their next look</h2>
         <p>
@@ -23,8 +21,8 @@ export default function ForBrands() {
 
         <h3>How it works</h3>
         <p>
-          One flat monthly fee. Featured spots are always labelled “Sponsored” so shoppers
-          know what they are looking at. Pricing is being finalised.
+          One flat monthly fee. Featured spots are always labeled “Sponsored” so shoppers
+          know what they are looking at. Pricing is being finalized.
         </p>
         <p className="notice">
           {BRAND_CONTACT_EMAIL
@@ -32,25 +30,6 @@ export default function ForBrands() {
             : 'Contact details are coming soon.'}
         </p>
 
-        <h3>Featured brand activity</h3>
-        <p className="hint">Counted on this device only while {APP_NAME} is in preview.</p>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr><th scope="col">Brand</th><th scope="col">Banner views</th><th scope="col">Store clicks</th><th scope="col">Listing views</th></tr>
-            </thead>
-            <tbody>
-              {FEATURED.map((f) => (
-                <tr key={f.brand}>
-                  <th scope="row">{f.brand}{f.example ? ' (example)' : ''}</th>
-                  <td>{stats[f.brand]?.bannerViews ?? 0}</td>
-                  <td>{stats[f.brand]?.storeClicks ?? 0}</td>
-                  <td>{stats[f.brand]?.listingViews ?? 0}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </main>
     </>
   )

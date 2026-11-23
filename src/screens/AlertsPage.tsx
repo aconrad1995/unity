@@ -22,14 +22,14 @@ export default function AlertsPage({ store, alerts }: { store: Store; alerts: Al
           <div className="empty">
             <span className="empty-art"><BellIcon /></span>
             <h2>Tell us what to look out for</h2>
-            <p>Add your sizes and favourite brands to your profile. When someone lists a match, it shows up here.</p>
+            <p>Add your sizes and favorite brands to your profile. When someone lists a match, it shows up here.</p>
             <a className="btn" href="#/you/prefs">Set my brands and sizes</a>
           </div>
         ) : alerts.matches.length === 0 ? (
           <div className="empty">
             <span className="empty-art"><BellIcon /></span>
             <h2>Nothing new yet</h2>
-            <p>New outfits from your favourite brands, in your sizes, will show up here and on the bell in the shop.</p>
+            <p>New outfits from your favorite brands, in your sizes, will show up here and on the bell in the shop.</p>
             <a className="btn" href="#/">Browse the shop</a>
           </div>
         ) : (
