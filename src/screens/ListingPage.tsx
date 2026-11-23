@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { CheckIcon, ListingImage } from '../art'
-import { CONDITIONS, SIZES, featuredFor, type ConditionId, type Listing, type Size } from '../data'
+import { CONDITIONS, SHIP_OPTIONS, SIZES, arrivesBefore, arrivesBy, featuredFor, type ConditionId, type Listing, type Size } from '../data'
+import { useGoing } from '../going'
 import { NO_ONE, bumpStat, nameOf, type Store } from '../store'
 import { Avatar } from './ProfilePage'
 import { noteListing } from '../taste'
@@ -96,6 +97,7 @@ export default function ListingPage({ store, id }: { store: Store; id: string })
             <div><dt>Type</dt><dd>{listing.category}</dd></div>
             {listing.wornAt && <div><dt>Worn at</dt><dd>{listing.wornAt}</dd></div>}
           </dl>
+          <Shipping listing={listing} />
 
           <div className={`cond-card cond-${listing.condition}`}>
             <p className="cond-card-label">{condition.label}</p>
@@ -210,6 +212,7 @@ function EditListing({ store, listing, done }: { store: Store; listing: Listing;
   const [size, setSize] = useState<Size>(listing.size)
   const [condition, setCondition] = useState<ConditionId>(listing.condition)
   const [description, setDescription] = useState(listing.description === 'No description added.' ? '' : listing.description)
+  const [shipDays, setShipDays] = useState(listing.shipDays)
   const [problem, setProblem] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -219,7 +222,7 @@ function EditListing({ store, listing, done }: { store: Store; listing: Listing;
     if (!title.trim()) return setProblem('Give your outfit a short name.')
     if (!(amount >= 1 && amount <= 10000)) return setProblem('Enter a price between $1 and $10,000.')
     setBusy(true)
-    const why = await store.editListing(listing.id, { title: title.trim(), price: amount, size, condition, description: description.trim() || 'No description added.' })
+    const why = await store.editListing(listing.id, { title: title.trim(), price: amount, size, condition, description: description.trim() || 'No description added.', ...(shipDays ? { shipDays } : {}) })
     setBusy(false)
     if (why) setProblem(why)
     else done()
@@ -247,6 +250,12 @@ function EditListing({ store, listing, done }: { store: Store; listing: Listing;
           {CONDITIONS.map((c) => <button key={c.id} type="button" className="bubble bubble-blue" aria-pressed={condition === c.id} onClick={() => setCondition(c.id)}>{c.label}</button>)}
         </div>
       </div>
+      <div className="field" role="group" aria-labelledby="edit-ship-l">
+        <span id="edit-ship-l">How fast can you send it?</span>
+        <div className="bubbles bubbles-wrap">
+          {SHIP_OPTIONS.map((o) => <button key={o.days} type="button" className="bubble" aria-pressed={shipDays === o.days} onClick={() => setShipDays(o.days)}>{o.label}</button>)}
+        </div>
+      </div>
       <label className="field"><span>Anything buyers should know?</span><textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} maxLength={400} /></label>
       {problem && <p className="error" role="alert">{problem}</p>}
       <div className="actions-row">
@@ -254,5 +263,22 @@ function EditListing({ store, listing, done }: { store: Store; listing: Listing;
         <button type="button" className="btn btn-soft" onClick={done}>Cancel</button>
       </div>
     </form>
+  )
+}
+
+/** When it ships and roughly when it lands, and whether that beats your next festival. */
+function Shipping({ listing }: { listing: Listing }) {
+  const { next } = useGoing()
+  const by = arrivesBy(listing)
+  if (!by || listing.status === 'sold') return null
+  const label = SHIP_OPTIONS.find((o) => o.days === listing.shipDays)?.label ?? ''
+  const when = by.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  const ev = next[0]
+  const inTime = ev ? arrivesBefore(listing, ev.date) : false
+  return (
+    <div className="ship-card">
+      <p><strong>Ships {label.toLowerCase()}.</strong> Ordered today, it should arrive by about {when}.</p>
+      {ev && <p className={inTime ? 'ship-ok' : 'ship-late'}>{inTime ? `In time for ${ev.name}` : `Might not arrive before ${ev.name}`}</p>}
+    </div>
   )
 }

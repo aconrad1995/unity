@@ -362,6 +362,8 @@ function checkLook(b) {
   return { caption: text(b.caption, 300), brands, photos }
 }
 
+const SHIP_DAYS = [1, 3, 7]
+
 function checkListing(b) {
   const title = text(b.title, 80)
   const brand = text(b.brand, 40)
@@ -377,7 +379,8 @@ function checkListing(b) {
   if (!given.every((p) => jpegOk(p, 700_000))) throw new Refuse(400, 'bad_photo')
   if (given.length === 0 && !art) throw new Refuse(400, 'missing_details')
   const wornAt = text(b.wornAt, 60)
-  return { title, brand, category: b.category, size: b.size, condition: b.condition, price, description: text(b.description, 600), art, photos: given, ...(wornAt ? { wornAt } : {}) }
+  const shipDays = SHIP_DAYS.includes(Number(b.shipDays)) ? Number(b.shipDays) : undefined
+  return { title, brand, category: b.category, size: b.size, condition: b.condition, price, description: text(b.description, 600), art, photos: given, ...(wornAt ? { wornAt } : {}), ...(shipDays ? { shipDays } : {}) }
 }
 
 // Names that would let someone pass themselves off as the shop or the team.
@@ -503,6 +506,10 @@ export async function api(req, res, next) {
       if ('price' in b) next.price = Math.round(Number(b.price))
       if ('size' in b) next.size = b.size
       if ('condition' in b) next.condition = b.condition
+      if ('shipDays' in b) {
+        if (SHIP_DAYS.includes(Number(b.shipDays))) next.shipDays = Number(b.shipDays)
+        else if (b.shipDays === null) delete next.shipDays
+      }
       if ('status' in b) next.status = ['sold', 'reserved'].includes(b.status) ? b.status : undefined
       if (!next.title || !(next.price >= 1 && next.price <= 10000) || !SIZES.includes(next.size) || !CONDITIONS.includes(next.condition)) throw new Refuse(400, 'bad_details')
       if (next.status === 'sold' && l.status !== 'sold') next.soldAt = Date.now()

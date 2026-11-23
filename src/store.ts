@@ -248,7 +248,7 @@ export function useStore() {
   }, [take])
 
   /** Changes a listing's details or marks it sold / reserved. Returns why it failed, or '' when it worked. */
-  const editListing = useCallback(async (id: string, change: Partial<Pick<Listing, 'title' | 'price' | 'description' | 'size' | 'condition'>> & { status?: Listing['status'] | null }) => {
+  const editListing = useCallback(async (id: string, change: Partial<Pick<Listing, 'title' | 'price' | 'description' | 'size' | 'condition' | 'shipDays'>> & { status?: Listing['status'] | null }) => {
     const r = await call('PATCH', `listings/${id}`, change)
     if (take(r.data)) return ''
     return r.error === 'bad_details' ? 'Check the name and price, then try again.' : r.status === 0 ? 'Unity can’t be reached. Check your connection.' : 'That change could not be saved. Try again in a moment.'

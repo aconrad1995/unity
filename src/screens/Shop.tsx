@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BellIcon, CameraIcon, HeartIcon, SearchIcon } from '../art'
 import type { Alerts } from '../alerts'
-import { APP_NAME, CATEGORIES, FEATURED, SIZES, conditionLabel, featuredFor } from '../data'
+import { APP_NAME, CATEGORIES, FEATURED, SIZES, arrivesBefore, conditionLabel, featuredFor } from '../data'
+import { useGoing } from '../going'
+import { dateParts } from '../events'
 import { bumpStat, readProfile, type Store } from '../store'
 import { hasSignals, note, noteSearch, readTaste, score } from '../taste'
 import { Card } from './Card'
@@ -14,6 +16,10 @@ export default function Shop({ store, alerts, initialBrand = '' }: { store: Stor
   const [brand, setBrand] = useState(initialBrand)
   const [category, setCategory] = useState('')
   const [size, setSize] = useState('')
+  // With a festival marked, shoppers can keep only what should arrive before it.
+  const nextFest = useGoing().next[0]
+  const [inTime, setInTime] = useState(false)
+  const timeFilter = inTime && nextFest ? nextFest : undefined
   // What this shopper is into, read once per visit so the order doesn't jump while they browse.
   const [taste] = useState(readTaste)
   const [profile] = useState(readProfile)
@@ -53,6 +59,7 @@ export default function Shop({ store, alerts, initialBrand = '' }: { store: Stor
       if (brand && l.brand !== brand) return false
       if (category && l.category !== category) return false
       if (size && l.size !== size) return false
+      if (timeFilter && !arrivesBefore(l, timeFilter.date)) return false
       const hay = `${l.title} ${l.brand} ${l.category} ${l.size} ${conditionLabel(l.condition)} ${l.description} ${l.wornAt ?? ''}`.toLowerCase()
       return words.every((w) => hay.includes(w))
     })
@@ -61,14 +68,15 @@ export default function Shop({ store, alerts, initialBrand = '' }: { store: Stor
     else if (sort === 'high') out.sort((a, b) => b.price - a.price)
     else out.sort((a, b) => b.createdAt - a.createdAt)
     return out
-  }, [store.listings, query, brand, category, size, sort, taste, profile])
+  }, [store.listings, query, brand, category, size, sort, taste, profile, timeFilter])
 
-  const filtered = Boolean(query || brand || category || size)
+  const filtered = Boolean(query || brand || category || size || timeFilter)
   const clear = () => {
     setQuery('')
     setBrand('')
     setCategory('')
     setSize('')
+    setInTime(false)
   }
 
   return (
@@ -182,6 +190,16 @@ export default function Shop({ store, alerts, initialBrand = '' }: { store: Stor
           </label>
         </div>
 
+        {nextFest && (
+          <button type="button" className="in-time" aria-pressed={inTime} onClick={() => setInTime(!inTime)}>
+            <span className="in-time-box" aria-hidden="true" />
+            <span>
+              <strong>Arrives before {nextFest.name}</strong>
+              <span>Only outfits that should reach you by {dateParts(nextFest.date, 1).range}</span>
+            </span>
+          </button>
+        )}
+
         <div className="results-bar" aria-live="polite">
           <p>{results.length} {results.length === 1 ? 'outfit' : 'outfits'}{brand ? ` from ${brand}` : ''}</p>
           {filtered && <button type="button" className="link-btn" onClick={clear}>Clear filters</button>}
@@ -202,7 +220,9 @@ export default function Shop({ store, alerts, initialBrand = '' }: { store: Stor
         ) : (
           <div className="empty">
             <h2>Nothing matches yet</h2>
-            <p>Try a different brand or size, or clear your filters to see everything.</p>
+            <p>{timeFilter
+              ? `Nothing is sure to arrive before ${timeFilter.name} yet. Some sellers haven’t said how fast they ship, so it’s worth messaging them to ask.`
+              : 'Try a different brand or size, or clear your filters to see everything.'}</p>
             <button type="button" className="btn" onClick={clear}>Show all outfits</button>
           </div>
         )}
