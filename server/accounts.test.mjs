@@ -48,6 +48,12 @@ test('a wrong password or unknown email gives the same answer', async () => {
   assert.deepEqual(wrong.body, unknown.body)
 })
 
+test('an enormous password is refused without being hashed', async () => {
+  const huge = await p.call('POST', 'account/signin', { email: 'mary@example.com', password: 'g'.repeat(1_000_000) })
+  assert.equal(huge.status, 401)
+  assert.equal(huge.body.error, 'wrong_login')
+})
+
 test('passwords are stored hashed and keys encrypted, never in plain text', async () => {
   const file = readFileSync(join(dir, 'unity.json'), 'utf8')
   assert.equal(file.includes('glitter-and-bass'), false)

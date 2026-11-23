@@ -434,7 +434,10 @@ const emailOf = (v) => (typeof v === 'string' && v.trim().length <= 160 && EMAIL
 async function checkPassword(account, password) {
   const want = Buffer.from(account?.hash ?? '0'.repeat(64), 'hex')
   // Unknown emails take as long as known ones, so timing doesn't reveal who has an account.
-  const got = Buffer.from(await hashOf(typeof password === 'string' ? password : '', account?.salt ?? '00'.repeat(16)), 'hex')
+  // Over-long guesses are hashed as empty, so nobody can make the server hash megabytes per try.
+  const given = typeof password === 'string' && password.length <= 200 ? password : ''
+  const got = Buffer.from(await hashOf(given, account?.salt ?? '00'.repeat(16)), 'hex')
+  if (given !== password) return false
   return !!account && got.length === want.length && timingSafeEqual(got, want)
 }
 
