@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { PinIcon, Sparkle } from '../art'
-import { APP_NAME } from '../data'
-import { CITIES, dateParts, loadEvents, milesBetween, sizeLabel, type RaveEvent } from '../events'
+import { CheckIcon, PinIcon } from '../art'
+import { CITIES, EVENTS_CHECKED, dateParts, loadEvents, milesBetween, type RaveEvent } from '../events'
 import { PageHeader } from './PageHeader'
 
 interface Spot { label: string; lat: number; lng: number }
@@ -29,7 +28,6 @@ export default function Events() {
   const [spot, setSpot] = useState<Spot | null>(() => load<Spot | null>(SPOT_KEY, null))
   const [going, setGoing] = useState<string[]>(() => load<string[]>(GOING_KEY, []))
   const [radius, setRadius] = useState(150)
-  const [sort, setSort] = useState<'big' | 'soon'>('big')
   const [locating, setLocating] = useState(false)
   const [problem, setProblem] = useState('')
 
@@ -65,18 +63,61 @@ export default function Events() {
       .filter((ev) => ev.date >= today)
       .map((ev) => ({ ev, miles: spot ? milesBetween(spot, ev) : null }))
     const near = spot && radius > 0 ? upcoming.filter((x) => x.miles !== null && x.miles <= radius) : upcoming
-    return near.sort((a, b) => (sort === 'big' ? b.ev.crowd - a.ev.crowd : a.ev.date.localeCompare(b.ev.date)))
-  }, [events, spot, radius, sort, today])
+    return near.sort((a, b) => a.ev.date.localeCompare(b.ev.date))
+  }, [events, spot, radius, today])
 
   const toggleGoing = (id: string) => setGoing((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
 
+  const [next, ...rest] = list
+  const months = useMemo(() => {
+    const groups: { label: string; items: typeof list }[] = []
+    for (const item of rest) {
+      const label = new Date(`${item.ev.date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+      const last = groups[groups.length - 1]
+      if (last && last.label === label) last.items.push(item)
+      else groups.push({ label, items: [item] })
+    }
+    return groups
+  }, [rest])
+
+  const renderEvent = ({ ev, miles }: { ev: RaveEvent; miles: number | null }, feature = false) => {
+    const d = dateParts(ev.date, ev.days)
+    const isGoing = going.includes(ev.id)
+    return (
+      <li key={ev.id} className={feature ? 'event event-feature' : 'event'}>
+        <div className="event-date" aria-hidden="true">
+          <span>{d.month}</span>
+          <strong>{String(d.day).padStart(2, '0')}</strong>
+          {ev.days > 1 && <small>{ev.days} days</small>}
+        </div>
+        <div className="event-main">
+          {feature && <p className="event-kicker">Next up · {d.away <= 0 ? 'today' : d.away === 1 ? 'tomorrow' : `in ${d.away} days`}</p>}
+          <h3>{ev.name}</h3>
+          <p className="event-when">{d.range}{!feature && <span className="event-away"> · {d.away <= 0 ? 'today' : d.away === 1 ? 'tomorrow' : `in ${d.away} days`}</span>}</p>
+          <p className="event-where">
+            {ev.place}, {ev.city}
+            {miles !== null && <> · <strong>{miles < 1 ? 'in town' : `${Math.round(miles)} miles away`}</strong></>}
+          </p>
+          {ev.note && <p className="event-note">{ev.note}</p>}
+          {ev.via && <p className="event-note">Listing from {ev.via}</p>}
+          <div className="event-actions">
+            <a className="btn" href={ev.url} target="_blank" rel="noopener noreferrer">Dates and tickets</a>
+            <button type="button" className={`btn btn-soft going${isGoing ? ' is-going' : ''}`} aria-pressed={isGoing} onClick={() => toggleGoing(ev.id)}>
+              {isGoing && <CheckIcon />} {isGoing ? 'I’m going' : 'Mark as going'}
+            </button>
+          </div>
+        </div>
+      </li>
+    )
+  }
+
   return (
     <>
-      <PageHeader title="Events near you" noBack />
-      <main className="page">
+      <PageHeader title="Events" noBack />
+      <main className="page events-page">
         <section className="where" aria-labelledby="where-h">
           <h2 id="where-h" className="row-h">
-            {spot ? <>Showing events near <strong>{spot.label}</strong></> : 'Where are you?'}
+            {spot ? <>Near <strong>{spot.label}</strong></> : 'Where are you?'}
           </h2>
           <div className="where-row">
             <button type="button" className="btn" onClick={useMyLocation} disabled={locating}>
@@ -96,28 +137,18 @@ export default function Events() {
                 {CITIES.map((c) => <option key={c.name}>{c.name}</option>)}
               </select>
             </label>
+            <label className="field-inline">
+              <span>How far</span>
+              <select value={radius} onChange={(e) => setRadius(Number(e.target.value))} disabled={!spot}>
+                <option value={50}>50 miles</option>
+                <option value={150}>150 miles</option>
+                <option value={500}>500 miles</option>
+                <option value={0}>Anywhere</option>
+              </select>
+            </label>
           </div>
           {problem && <p className="error" role="alert">{problem}</p>}
         </section>
-
-        <div className="selects">
-          <label className="field-inline">
-            <span>How far</span>
-            <select value={radius} onChange={(e) => setRadius(Number(e.target.value))} disabled={!spot}>
-              <option value={50}>50 miles</option>
-              <option value={150}>150 miles</option>
-              <option value={500}>500 miles</option>
-              <option value={0}>Anywhere</option>
-            </select>
-          </label>
-          <label className="field-inline">
-            <span>Order</span>
-            <select value={sort} onChange={(e) => setSort(e.target.value as 'big' | 'soon')}>
-              <option value="big">Biggest first</option>
-              <option value="soon">Soonest first</option>
-            </select>
-          </label>
-        </div>
 
         <div className="results-bar" aria-live="polite">
           <p>
@@ -133,42 +164,17 @@ export default function Events() {
           </div>
         )}
 
-        <ul className="events">
-          {list.map(({ ev, miles }) => {
-            const d = dateParts(ev.date, ev.days)
-            const isGoing = going.includes(ev.id)
-            return (
-              <li key={ev.id} className="event">
-                <div className="event-date" aria-hidden="true">
-                  <span>{d.month}</span>
-                  <strong>{d.day}</strong>
-                </div>
-                <div className="event-main">
-                  <h3>{ev.name}</h3>
-                  <p className="event-when">{d.range} · {d.away <= 0 ? 'today' : d.away === 1 ? 'tomorrow' : `in ${d.away} days`}</p>
-                  <p className="event-where">
-                    {ev.place}, {ev.city}
-                    {miles !== null && <> · <strong>{miles < 1 ? 'in town' : `${Math.round(miles)} miles away`}</strong></>}
-                  </p>
-                  <p className="card-meta">
-                    <span className={`cond size-${sizeLabel(ev.crowd).toLowerCase()}`}>{sizeLabel(ev.crowd)} · about {ev.crowd.toLocaleString('en-US')} people</span>
-                    {ev.sounds.map((s) => <span key={s} className="size-pill">{s}</span>)}
-                    {ev.sample && <span className="sample-inline">Sample</span>}
-                  </p>
-                  <div className="event-actions">
-                    <button type="button" className={`btn btn-soft going${isGoing ? ' is-going' : ''}`} aria-pressed={isGoing} onClick={() => toggleGoing(ev.id)}>
-                      {isGoing && <Sparkle size={16} />} {isGoing ? 'I’m going' : 'Mark as going'}
-                    </button>
-                    <a className="btn" href="#/">Shop outfits</a>
-                  </div>
-                </div>
-              </li>
-            )
-          })}
-        </ul>
+        {next && <ul className="events events-lead">{renderEvent(next, true)}</ul>}
+
+        {months.map((m) => (
+          <section key={m.label} className="month" aria-label={m.label}>
+            <h2 className="month-h">{m.label}</h2>
+            <ul className="events">{m.items.map((x) => renderEvent(x))}</ul>
+          </section>
+        ))}
 
         <p className="fineprint">
-          This is a preview of {APP_NAME}. Events marked “Sample” are made-up examples, not real events.
+          Dates checked {EVENTS_CHECKED} against each festival’s announcements. They can change, so confirm on the festival’s own page before you buy.
           Your location stays on this device.
         </p>
       </main>

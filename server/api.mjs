@@ -14,6 +14,7 @@
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto'
 import { closeSync, copyFileSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { edmtrainEvents } from './edmtrain.mjs'
 
 const DIR = resolve(process.env.UNITY_DATA_DIR || join(process.cwd(), '.data'))
 const FILE = join(DIR, 'unity.json')
@@ -402,6 +403,11 @@ export async function api(req, res, next) {
       const same = want && typeof got === 'string' && got.length === want.length && timingSafeEqual(Buffer.from(got), Buffer.from(want))
       if (!same) throw new Refuse(404, 'not_found')
       return send(res, 200, { reports: db.reports })
+    }
+
+    // Public festival listings from EDMTrain. Empty unless the host has a key.
+    if (req.method === 'GET' && path === 'events') {
+      return send(res, 200, { events: await edmtrainEvents() })
     }
 
     // Listing photos load as ordinary pictures, so they cannot carry the secret key. They are public like the listing.
